@@ -22,9 +22,10 @@ class Algo:
 
     def run(self, iterations):
         solutions = self.get_founder_gen()
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=100)
         for i in range(iterations):
             solutions = self.evolve_new_gen(solutions)
-
+        self.executor.shutdown(wait=True)
         return solutions
             
     
@@ -76,7 +77,7 @@ class Algo:
         self.validate_solution(sol2)
 
     
-    def apply_perm(self, message, solution):
+    def decode_message(self, message, solution):
         """apply permutation to message according to the
         permutation dictionary
 
@@ -97,7 +98,7 @@ class Algo:
         
         # for evaluation, remove all non abc characters
         cut_message = re.sub('[0-9\[\](){}<>;@&^%$!*?,.\n]', '', self.encoded_message)
-        decrypt_message = self.apply_perm(cut_message, solution)
+        decrypt_message = self.decode_message(cut_message, solution)
 
         message_words = decrypt_message.split(" ")
 
@@ -120,7 +121,6 @@ class Algo:
                     # criteriea 3: sum of frequencies of pairs of letters
                     pair_score += self.pair_freq[word[i:i+2]]
         
-        # valid_word_count = valid_word_count / len(message_words)
         valid_word_count = valid_word_count / len(message_words)
         letter_score = letter_score / len(decrypt_message)
         pair_score = pair_score / len(decrypt_message)
@@ -169,11 +169,10 @@ class Algo:
     def evolve_new_gen(self, solutions):
         dtype = [('score', float), ('index', int)]
         score_index_arr = np.array([(0, 0) for i in range(self.gen_size)], dtype=dtype)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=100) as executor:
-            for ind, score in zip(np.arange(self.gen_size), executor.map(self.eval_func, solutions)):
-                score = self.softmax(score)
-                score_index_arr[ind]['score'] = score
-                score_index_arr[ind]['index'] = ind
+        for ind, score in zip(np.arange(self.gen_size), self.executor.map(self.eval_func, solutions,chunksize=1)):
+            score = self.softmax(score)
+            score_index_arr[ind]['score'] = score
+            score_index_arr[ind]['index'] = ind
         
         # sorts the solutions in ascending order
         score_index_arr.sort(order='score')
