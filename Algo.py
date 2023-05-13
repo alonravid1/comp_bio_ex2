@@ -18,6 +18,7 @@ class Algo:
         self.mutation_rate = mutation_rate
         # make gen size even to make life easier
         self.gen_size = gen_size + (gen_size % 2)
+        self.rng = np.random.default_rng(7)
         
 
     def run(self, iterations):
@@ -65,7 +66,7 @@ class Algo:
     def cross_over(self, sol1, sol2):
         # choose random point in the dict
         # to swap the dictionaries, with at least 1 swap
-        crossing_point = np.random.randint(1,25)
+        crossing_point = self.rng.randint(1,25)
 
         temp = sol1[:crossing_point].copy()
         sol1[:crossing_point], sol2[:crossing_point] = sol2[:crossing_point], temp
@@ -132,9 +133,9 @@ class Algo:
     
     def mutate(self, solution):
         for i in range(26):
-            rand = np.random.rand(1)
+            rand = self.rng.rand(1)
             if rand <= self.mutation_rate:
-                swap = np.random.randint(25)
+                swap = self.rng.randint(25)
                 
                 temp = solution[i].copy()
                 solution[i] = solution[swap]
@@ -142,12 +143,11 @@ class Algo:
 
             
     def get_founder_gen(self):
-        rng = np.random.default_rng(7)
         solutions = np.tile(self.sol_rep, (self.gen_size, 1))
         for i in solutions:
             # this is done in a for loop because shuffling all
             # at once shuffles them the same way
-            rng.shuffle(i)
+            self.rng.shuffle(i)
         return solutions
     
     def softmax(self, x):
@@ -186,17 +186,17 @@ class Algo:
         replicated = int(self.gen_size*self.replication_rate)
         replicated += replicated % 2
         new_solutions[0:replicated] = np.tile(solutions[score_index_arr[-1]['index']], (replicated,1))
-
+        random_portions = self.rng.rand(50,2)
         for i in range(replicated, self.gen_size, 2):
             # for all other solutions, pick two at a time to
             # crossover and add to the new generation, biased
             # such that higher scoring solutions have a higher
             # of being picked
-            rand1 = np.random.rand(1)
-            rand2 = np.random.rand(1)
+            rand1 = self.rng.rand(1)
+            rand2 = self.rng.rand(1)
 
-            # rand1 = np.random.randint(0, self.gen_size)
-            # rand2 = np.random.randint(0, self.gen_size)
+            # rand1 = self.rng.randint(0, self.gen_size)
+            # rand2 = self.rng.randint(0, self.gen_size)
 
             score_rank1 = np.searchsorted(score_index_arr['score'], rand1, side='right')
             score_rank2 = np.searchsorted(score_index_arr['score'], rand2, side='right')
