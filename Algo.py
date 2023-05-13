@@ -187,7 +187,7 @@ class Algo:
         replicated += replicated % 2
         new_solutions[0:replicated] = np.tile(solutions[score_index_arr[-1]['index']], (replicated,1))
         random_portions = self.rng.rand(50,2)
-        for i in range(replicated, self.gen_size, 2):
+        for i in zip(range(replicated, self.gen_size, 2), ):
             # for all other solutions, pick two at a time to
             # crossover and add to the new generation, biased
             # such that higher scoring solutions have a higher
