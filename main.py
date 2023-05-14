@@ -1,5 +1,6 @@
 import numpy as np
 from Algo import Algo
+import time
 
 if __name__ == "__main__":
     
@@ -39,6 +40,9 @@ if __name__ == "__main__":
 
     genetic_algo = Algo(*algo_settings)
     solutions = genetic_algo.run(1)
+    print("blah")
+    mess = genetic_algo.eval_func(solutions, 0, True)
+
 
     # print(genetic_algo.decode_message(enc_mess, solutions[0]))
     # print(alphabet[solutions[0]])
