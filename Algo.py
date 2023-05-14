@@ -3,6 +3,7 @@ import re
 from timebudget import timebudget
 import concurrent.futures
 import functools
+import time
 
 class Algo:
     
@@ -186,12 +187,11 @@ class Algo:
         return score_rank1, score_rank2
         
     
-    # @timebudget
     def evolve_new_gen(self, solutions):
         
         dtype = [('score', float), ('index', int)]
         score_index_arr = np.array([(0, 0) for i in range(self.gen_size)], dtype=dtype)
-
+        start1 = time.time()
         # create_si_arr = functools.partial(self.eval_func, score_index_arr=score_index_arr)
         score_futures = [self.executor.submit(self.eval_func,
                                 solutions, i) for i in range(self.gen_size)]
@@ -200,7 +200,7 @@ class Algo:
             score, index = future.result()
             score_index_arr[index]['index'] = index
             score_index_arr[index]['score'] = score
-
+        end1 = time.time()
         # concurrent.futures.wait(si_array_futures, return_when="ALL_COMPLETED")
             
         score_sum = np.sum(score_index_arr['score'])
@@ -208,7 +208,7 @@ class Algo:
 
         # fixed_softmax = functools.partial(self.softmax, vec_sum=score_sum, max_val=max_val)
         # self.executor.map(fixed_softmax, score_index_arr['score'], chunksize=15)
-
+        start2 = time.time()
         softmax_futures = [self.executor.submit(self.softmax,
                                 score_index_arr[i]['score'], i, score_sum, max_val)
                                   for i in range(self.gen_size)]
@@ -216,7 +216,7 @@ class Algo:
         for future in concurrent.futures.as_completed(softmax_futures):
             score, index = future.result()
             score_index_arr[index]['score'] = score
-
+        end2 = time.time()
         # concurrent.futures.wait(softmax_futures, return_when="ALL_COMPLETED")
 
         # sorts the solutions in ascending order
@@ -238,10 +238,11 @@ class Algo:
 
         # fixed_get_index = functools.partial(self.get_index, score_index_arr=score_index_arr)
         # cross_over_pairs = self.executor.map(fixed_get_index, random_portions, chunksize=1)
-
+        start3 = time.time()
         cross_over_futures = [self.executor.submit(self.get_index, rands, score_index_arr)
                                for rands in random_portions]
-
+        end3 = time.time()
+        start4 = time.time()
         for future in concurrent.futures.as_completed(cross_over_futures):
             score_rank1, score_rank2 = future.result()
 
@@ -257,8 +258,13 @@ class Algo:
             new_solutions = np.concatenate((new_solutions, [sol1]), axis=0)
             new_solutions = np.concatenate((new_solutions, [sol2]), axis=0)
 
-
+        end4 = time.time()
         # self.executor.map(self.mutate, new_solutions, score_index_arr,chunksize=1)
+
+        print(end1-start1)
+        print(end2-start2)
+        print(end3-start3)
+        print(end4-start4)
         return(new_solutions)
         
         
