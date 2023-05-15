@@ -1,6 +1,8 @@
 import numpy as np
 from Algo import Algo
 import time
+import concurrent.futures
+
 
 if __name__ == "__main__":
     
@@ -33,15 +35,15 @@ if __name__ == "__main__":
     replication_rate = 0.1
     cross_over_rate = 1-replication_rate
     mutation_rate = 0.1
-
+    executor = concurrent.futures.ThreadPoolExecutor()
     algo_settings = [enc_mess, letter_freq, pair_freq, words,
-                      replication_rate, cross_over_rate, mutation_rate, gen_size]
+                      replication_rate, cross_over_rate, mutation_rate, gen_size, executor]
         
 
     genetic_algo = Algo(*algo_settings)
     solutions = genetic_algo.run(1)
-    print("blah")
-    mess = genetic_algo.eval_func(solutions, 0, True)
+    mess = genetic_algo.eval_func(solutions[0], True)
+    executor.shutdown(wait=True)
 
 
     # print(genetic_algo.decode_message(enc_mess, solutions[0]))

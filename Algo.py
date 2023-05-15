@@ -8,7 +8,7 @@ import time
 class Algo:
     
     def __init__(self, enc_message, letter_freq, pair_freq, dict_words,
-                  replication_rate, cross_over_rate, mutation_rate, gen_size):
+                  replication_rate, cross_over_rate, mutation_rate, gen_size, executor):
         self.alphabet = np.array([chr(i) for i in range(ord('a'), ord('z') + 1)])
         self.sol_rep = np.arange(26)
         self.encoded_message = enc_message
@@ -21,14 +21,15 @@ class Algo:
         # make gen size even to make life easier
         self.gen_size = gen_size + (gen_size % 2)
         self.rng = np.random.default_rng(7)
+        self.executor = executor
         
 
     def run(self, iterations):
         solutions = self.get_founder_gen()
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=100)
+        # self.executor = concurrent.futures.ThreadPoolExecutor()
         for i in range(iterations):
             solutions = self.evolve_new_gen(solutions)
-        self.executor.shutdown(wait=True)
+        # self.executor.shutdown(wait=True)
         return solutions
             
     
@@ -52,15 +53,6 @@ class Algo:
 
 
         if len(double_letters) != len(missing_letters):
-            print("solution:")
-            for i in range(len(solution)):
-                print(solution[i])
-            print("double_letters:")
-            for i in range(len(double_letters)):
-                print(double_letters[i])
-            print("missing_letters:")
-            for i in range(len(missing_letters)):
-                print(missing_letters[i])
             print("error in validation")
             exit()
         
@@ -102,7 +94,6 @@ class Algo:
         Returns:
             string: message after applying permutation dictionary
         """
-
         table = str.maketrans("".join(self.alphabet), "".join(self.alphabet[solution]))
         new_message = message.translate(table)
         
@@ -124,40 +115,34 @@ class Algo:
         
         letter_score = letter_score / len(word)
         pair_score = pair_score / len(word)
-        score = 10*valid_word_count + 5*letter_score + pair_score
+        score = 10*valid_word + 5*letter_score + pair_score
         return score
     
-    def eval_func(self, solutions, index, prints=False):
-        
+    def eval_func(self, solution, prints=False):
         # for evaluation, remove all non abc characters
         cut_message = re.sub('[0-9\[\](){}<>;@&^%$!*?,.\n]', '', self.encoded_message)
-        decrypt_message = self.decode_message(cut_message, solutions[index])
+        decrypt_message = self.decode_message(cut_message, solution)
 
         message_words = decrypt_message.split(" ")
 
         # remove any empty words
         while message_words.count("") != 0:
             message_words.remove("")
-        
-        valid_word_count = 0
-        letter_score = 0
-        pair_score = 0
-        
+
+        score = 0
+
         start3 = time.time()
         ## used eval word to multithread this part
-        for word in message_words:
-            
-        
-        valid_word_count = valid_word_count / len(message_words)
-        letter_score = letter_score / len(decrypt_message)
-        pair_score = pair_score / len(decrypt_message)
-        score = 10*valid_word_count + 5*letter_score + pair_score
+        score_futures = [self.executor.submit(self.eval_word, word) for word in message_words]
+        for word_score in concurrent.futures.as_completed(score_futures):
+            score += word_score.result()
+
         end3 = time.time()
         
         if prints:
             print(f"third:{end3-start3}")
 
-        return score, index
+        return score
     
     
     def mutate(self, solution):
@@ -179,17 +164,6 @@ class Algo:
             self.rng.shuffle(i)
         return solutions
     
-    def softmax(self, x, i, vec_sum, max_val):
-        """softmax function which replaces the given value with
-        the softmax output value. reducing the max element from each
-        element is done for better numerical stabilty.
-
-        Args:
-            x (_type_): _description_
-        """
-        vec = np.exp(x - max_val)
-        x = (vec / vec_sum)
-        return x, i
     
     def get_index(self, rands, score_index_arr):
         rand1, rand2 = rands[0], rands[1]
@@ -203,35 +177,39 @@ class Algo:
             print(score_index_arr[-2])
             print(score_index_arr[-1])
         return score_rank1, score_rank2
-        
+    
+    def softmax(self, score_arr):
+        max_val = np.max(score_arr)
+        score_arr -= max_val
+
+        score_arr = np.exp(score_arr)
+        score_sum = np.sum(score_arr)
+        score_arr =  score_arr / score_sum
+        return score_arr
     
     def evolve_new_gen(self, solutions):
         
         dtype = [('score', float), ('index', int)]
         score_index_arr = np.array([(0, 0) for i in range(self.gen_size)], dtype=dtype)
         # create_si_arr = functools.partial(self.eval_func, score_index_arr=score_index_arr)
-        score_futures = [self.executor.submit(self.eval_func,
-                                solutions, i) for i in range(self.gen_size)]
+        # score_futures = [self.executor.submit(self.eval_func,
+        #                         solutions, i) for i in range(self.gen_size)]
         
-        for future in concurrent.futures.as_completed(score_futures):
-            score, index = future.result()
+        # for future in concurrent.futures.as_completed(score_futures):
+        #     score, index = future.result()
+        #     score_index_arr[index]['index'] = index
+        #     score_index_arr[index]['score'] = score
+
+        for index in range(self.gen_size):
+        # score, index = future.result()
+            score = self.eval_func(solutions[index])
             score_index_arr[index]['index'] = index
             score_index_arr[index]['score'] = score
-        # concurrent.futures.wait(si_array_futures, return_when="ALL_COMPLETED")
             
-        score_sum = np.sum(score_index_arr['score'])
-        max_val = np.max(score_index_arr['score'])
+        # concurrent.futures.wait(si_array_futures, return_when="ALL_COMPLETED")
 
-        # fixed_softmax = functools.partial(self.softmax, vec_sum=score_sum, max_val=max_val)
-        # self.executor.map(fixed_softmax, score_index_arr['score'], chunksize=15)
-        softmax_futures = [self.executor.submit(self.softmax,
-                                score_index_arr[i]['score'], i, score_sum, max_val)
-                                  for i in range(self.gen_size)]
-
-        for future in concurrent.futures.as_completed(softmax_futures):
-            score, index = future.result()
-            score_index_arr[index]['score'] = score
-        # concurrent.futures.wait(softmax_futures, return_when="ALL_COMPLETED")
+        
+        score_index_arr['score'] = self.softmax(score_index_arr['score'])
 
         # sorts the solutions in ascending order
         score_index_arr.sort(order='score')
@@ -254,6 +232,7 @@ class Algo:
         # cross_over_pairs = self.executor.map(fixed_get_index, random_portions, chunksize=1)
         cross_over_futures = [self.executor.submit(self.get_index, rands, score_index_arr)
                                for rands in random_portions]
+        concurrent.futures.wait(cross_over_futures)
 
         for future in concurrent.futures.as_completed(cross_over_futures):
             score_rank1, score_rank2 = future.result()
