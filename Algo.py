@@ -1,10 +1,28 @@
 import numpy as np
 import re
-from timebudget import timebudget
-import concurrent.futures
-import functools
 import time
 
+def pickle_eval_word(args):
+    word, word_dict, letter_freq, pair_freq = args
+    valid_word = 0
+    letter_score = 0
+    pair_score = 0
+    if word in word_dict:
+            # criteriea 1: words in dict/words in message
+            valid_word = 1
+    for i in range(len(word)):
+        # criteriea 2: sum of frequencies of single letters
+        letter_score += letter_freq[word[i]]
+        if i+1 < len(word):
+            # criteriea 3: sum of frequencies of pairs of letters
+            pair_score += pair_freq[word[i:i+2]]
+    
+    letter_score = letter_score / len(word)
+    pair_score = pair_score / len(word)
+    score = 10*valid_word + 5*letter_score + pair_score
+    return score
+    
+    
 class Algo:
     
     def __init__(self, enc_message, letter_freq, pair_freq, dict_words,
@@ -118,7 +136,7 @@ class Algo:
         score = 10*valid_word + 5*letter_score + pair_score
         return score
     
-    def eval_func(self, solution, prints=False):
+    def eval_func(self, solution):
         # for evaluation, remove all non abc characters
         cut_message = re.sub('[0-9\[\](){}<>;@&^%$!*?,.\n]', '', self.encoded_message)
         decrypt_message = self.decode_message(cut_message, solution)
@@ -130,17 +148,13 @@ class Algo:
             message_words.remove("")
 
         score = 0
+        iterable_args = [[word, self.dict_words, self.letter_freq, self.pair_freq] for word in message_words]
 
-        start3 = time.time()
         ## used eval word to multithread this part
-        score_futures = [self.executor.submit(self.eval_word, word) for word in message_words]
-        for word_score in concurrent.futures.as_completed(score_futures):
-            score += word_score.result()
+        score_futures = self.executor.map_async(pickle_eval_word, iterable_args, chunksize=700)
 
-        end3 = time.time()
-        
-        if prints:
-            print(f"third:{end3-start3}")
+        word_scores = np.array(score_futures.get())
+        score = np.sum(word_scores)
 
         return score
     
@@ -169,13 +183,13 @@ class Algo:
         rand1, rand2 = rands[0], rands[1]
         score_rank1 = np.searchsorted(score_index_arr['score'], rand1, side='right')
         score_rank2 = np.searchsorted(score_index_arr['score'], rand2, side='right')
-        if score_rank1 == 100 or score_rank2 == 100:
-            print("problem!")
-            print(rand1)
-            print(rand2)
-            print(score_index_arr[0])
-            print(score_index_arr[-2])
-            print(score_index_arr[-1])
+
+        if score_rank1 == 100:
+            score_rank1 = 99
+
+        if score_rank2 == 100:
+            score_rank2 = 99
+
         return score_rank1, score_rank2
     
     def softmax(self, score_arr):
@@ -191,22 +205,13 @@ class Algo:
         
         dtype = [('score', float), ('index', int)]
         score_index_arr = np.array([(0, 0) for i in range(self.gen_size)], dtype=dtype)
-        # create_si_arr = functools.partial(self.eval_func, score_index_arr=score_index_arr)
-        # score_futures = [self.executor.submit(self.eval_func,
-        #                         solutions, i) for i in range(self.gen_size)]
-        
-        # for future in concurrent.futures.as_completed(score_futures):
-        #     score, index = future.result()
-        #     score_index_arr[index]['index'] = index
-        #     score_index_arr[index]['score'] = score
+
 
         for index in range(self.gen_size):
-        # score, index = future.result()
             score = self.eval_func(solutions[index])
             score_index_arr[index]['index'] = index
             score_index_arr[index]['score'] = score
             
-        # concurrent.futures.wait(si_array_futures, return_when="ALL_COMPLETED")
 
         
         score_index_arr['score'] = self.softmax(score_index_arr['score'])
@@ -218,7 +223,6 @@ class Algo:
         for i in range(1, self.gen_size):
             score_index_arr[i]['score'] = score_index_arr[i]['score'] + score_index_arr[i-1]['score']
 
-        # new_solutions = np.zeros((self.gen_size, 26), dtype=int)
 
         # replicate the best solution
         replicated = int(self.gen_size*self.replication_rate)
@@ -227,15 +231,11 @@ class Algo:
         crossed_over_portion = (self.gen_size - replicated)//2
         
         random_portions = self.rng.random((crossed_over_portion,2))
+        cross_over_pairs = [self.get_index(rands, score_index_arr) for rands in random_portions]
+        
 
-        # fixed_get_index = functools.partial(self.get_index, score_index_arr=score_index_arr)
-        # cross_over_pairs = self.executor.map(fixed_get_index, random_portions, chunksize=1)
-        cross_over_futures = [self.executor.submit(self.get_index, rands, score_index_arr)
-                               for rands in random_portions]
-        concurrent.futures.wait(cross_over_futures)
-
-        for future in concurrent.futures.as_completed(cross_over_futures):
-            score_rank1, score_rank2 = future.result()
+        for pair in cross_over_pairs:
+            score_rank1, score_rank2 = pair
 
             # for all other solutions, pick two at a time to
             # crossover and add to the new generation, biased
@@ -249,7 +249,6 @@ class Algo:
             new_solutions = np.concatenate((new_solutions, [sol1]), axis=0)
             new_solutions = np.concatenate((new_solutions, [sol2]), axis=0)
 
-        # self.executor.map(self.mutate, new_solutions, score_index_arr,chunksize=1)
 
 
         return(new_solutions)

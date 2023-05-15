@@ -1,7 +1,7 @@
 import numpy as np
 from Algo import Algo
 import time
-import concurrent.futures
+import multiprocessing as mp
 
 
 if __name__ == "__main__":
@@ -31,20 +31,22 @@ if __name__ == "__main__":
             freq, pair = line.split("\t")
             pair_freq[pair.lower()] = float(freq)
 
-    gen_size = 100
+    gen_size = 500
     replication_rate = 0.1
     cross_over_rate = 1-replication_rate
     mutation_rate = 0.1
-    executor = concurrent.futures.ThreadPoolExecutor()
-    algo_settings = [enc_mess, letter_freq, pair_freq, words,
-                      replication_rate, cross_over_rate, mutation_rate, gen_size, executor]
-        
+    mp.set_start_method('fork')
+    with mp.Pool(10) as executor:
+        algo_settings = [enc_mess, letter_freq, pair_freq, words,
+                        replication_rate, cross_over_rate, mutation_rate, gen_size, executor]
+            
 
-    genetic_algo = Algo(*algo_settings)
-    solutions = genetic_algo.run(1)
-    mess = genetic_algo.eval_func(solutions[0], True)
-    executor.shutdown(wait=True)
+        genetic_algo = Algo(*algo_settings)
+        start = time.time()
 
+        solutions = genetic_algo.run(10)
+        end = time.time()
+        print(end-start)
 
     # print(genetic_algo.decode_message(enc_mess, solutions[0]))
     # print(alphabet[solutions[0]])
