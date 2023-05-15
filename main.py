@@ -15,7 +15,9 @@ if __name__ == "__main__":
         enc_mess = encrypted_file.read()
 
     with open("dict.txt") as word_dict:
-        words = set(word_dict.readlines())
+        # words = set(word_dict.readlines())
+        text = word_dict.read()
+        words = set(text.split("\n"))
 
     with open("Letter_Freq.txt") as letter_freq_file:
         for line in letter_freq_file.readlines():
@@ -31,38 +33,24 @@ if __name__ == "__main__":
             freq, pair = line.split("\t")
             pair_freq[pair.lower()] = float(freq)
 
-    gen_size = 500
-    replication_rate = 0.1
+    gen_size = 300
+    replication_rate = 0.05
     cross_over_rate = 1-replication_rate
-    mutation_rate = 0.1
-    mp.set_start_method('fork')
-    with mp.Pool(10) as executor:
+    mutation_rate = 0.04
+    start = time.time()
+    mp.set_start_method('spawn')
+    with mp.Pool(60) as executor:
         algo_settings = [enc_mess, letter_freq, pair_freq, words,
                         replication_rate, cross_over_rate, mutation_rate, gen_size, executor]
             
 
         genetic_algo = Algo(*algo_settings)
-        start = time.time()
+        
 
-        solutions = genetic_algo.run(10)
+        solutions = genetic_algo.run(200)
+        print(genetic_algo.decode_message(enc_mess, solutions[-1]))
+        print(alphabet[solutions[-1]])
         end = time.time()
-        print(end-start)
-
-    # print(genetic_algo.decode_message(enc_mess, solutions[0]))
-    # print(alphabet[solutions[0]])
-
-    # rng = np.random.default_rng(7)
-    # solutions = np.tile(sol_rep, (10, 1))
-    # for i in solutions:
-    #     # this is done in a for loop because shuffling all
-    #     # at once shuffles them the same way
-    #     rng.shuffle(i)
-    # new_solutions = np.zeros((10, 26))
-    # print(solutions.shape)
-    # print(new_solutions.shape)
-
-
-
-    # print(apply_perm(enc_mess, dict1))
-    # mess = apply_perm(enc_mess, dict1)
-    # cross_over(dict1, dict2)
+        
+    print(end-start)
+   
