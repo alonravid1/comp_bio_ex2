@@ -22,7 +22,7 @@ def pickle_eval_word(args):
     
     letter_score = letter_score / len(word)
     pair_score = pair_score / len(word)
-    score = 3*valid_word + letter_score + 2*pair_score
+    score = 10*valid_word + letter_score + 2*pair_score
     return score
     
     
@@ -75,6 +75,8 @@ class Algo:
                 previous_best = solutions[-1].copy()
                 previous_best_count = 0
             # print(self.fitness_count)
+            if i%50 == 0:
+                print(np.sum(np.std(solutions[:, i]) for i in range(26)))
             i += 1
             
         return solutions

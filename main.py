@@ -33,10 +33,10 @@ if __name__ == "__main__":
             freq, pair = line.split("\t")
             pair_freq[pair.lower()] = float(freq)
 
-    gen_size = 300
+    gen_size = 250
     replication_rate = 0.05
     cross_over_rate = 1-replication_rate
-    mutation_rate = 0.04
+    mutation_rate = 0.06
     start = time.time()
     mp.set_start_method('spawn')
     with mp.Pool(60) as executor:
@@ -47,7 +47,7 @@ if __name__ == "__main__":
         genetic_algo = Algo(*algo_settings)
         
 
-        solutions = genetic_algo.run(200)
+        solutions = genetic_algo.run(250)
         print(genetic_algo.decode_message(enc_mess, solutions[-1]))
         print(alphabet[solutions[-1]])
         end = time.time()
