@@ -33,24 +33,39 @@ if __name__ == "__main__":
             freq, pair = line.split("\t")
             pair_freq[pair.lower()] = float(freq)
 
-    gen_size = 250
+    gen_size = 400
     replication_rate = 0.05
     cross_over_rate = 1-replication_rate
-    mutation_rate = 0.06
-    start = time.time()
+    mutation_rate = 0.05
+    word_coeff = 10
+    letter_coeff = 4
+    pair_coeff = 1
+    
     mp.set_start_method('spawn')
     with mp.Pool(60) as executor:
         algo_settings = [enc_mess, letter_freq, pair_freq, words,
-                        replication_rate, cross_over_rate, mutation_rate, gen_size, executor]
+                        replication_rate, cross_over_rate,
+                        mutation_rate, gen_size, executor,
+                        word_coeff, letter_coeff, pair_coeff]
             
 
         genetic_algo = Algo(*algo_settings)
         
-
-        solutions = genetic_algo.run(250)
-        print(genetic_algo.decode_message(enc_mess, solutions[-1]))
-        print(alphabet[solutions[-1]])
+        start = time.time()
+        solutions = genetic_algo.run(450)
+        
         end = time.time()
+        plain_text = genetic_algo.decode_message(enc_mess, solutions[-1])
+        print(plain_text)
+        print(alphabet[solutions[-1]])
+        
+        
+    with open("perm.txt", 'w+') as gen_perm:
+        for i in range(len(solutions[-1])):
+            letter = alphabet[solutions[-1][i]]
+            gen_perm.write(f"{alphabet[i]} {letter}\n")
+    with open("plain.txt", 'w+') as gen_sol:
+        gen_sol.write(plain_text)
         
     print(end-start)
    

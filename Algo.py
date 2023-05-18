@@ -4,7 +4,9 @@ import re
 import time
 
 def pickle_eval_word(args):
-    word, word_set, letter_freq, pair_freq = args
+    word, word_set, letter_freq, pair_freq = args[:4]
+    word_coeff, letter_coeff, pairs_coeff = args[4:]
+
     valid_word = 0
     letter_score = 0
     pair_score = 0
@@ -22,16 +24,21 @@ def pickle_eval_word(args):
     
     letter_score = letter_score / len(word)
     pair_score = pair_score / len(word)
-    score = 10*valid_word + letter_score + 2*pair_score
+    score = (word_coeff*valid_word +
+            letter_coeff*letter_score + pairs_coeff*pair_score)
     return score
     
     
 class Algo:
     
-    def __init__(self, enc_message, letter_freq, pair_freq, word_set,
-                  replication_rate, cross_over_rate, mutation_rate, gen_size, executor):
+    def __init__(self, enc_message, letter_freq, pair_freq,
+                 word_set, replication_rate, cross_over_rate,
+                 mutation_rate, gen_size, executor, word_coeff,
+                 letter_coeff, pairs_coeff):
+        
         self.alphabet = np.array([chr(i) for i in range(ord('a'), ord('z') + 1)])
         self.sol_rep = np.arange(26)
+        
         self.encoded_message = enc_message
         self.letter_freq = letter_freq
         self.pair_freq = pair_freq
@@ -39,19 +46,24 @@ class Algo:
         self.replication_rate = replication_rate
         self.cross_over_rate = cross_over_rate
         self.mutation_rate = mutation_rate
+        
         # make gen size even to make life easier
         self.gen_size = gen_size + (gen_size % 2)
+        
         self.rng = np.random.default_rng(7)
         self.executor = executor
+        self.word_coeff = word_coeff
+        self.letter_coeff = letter_coeff
+        self.pairs_coeff = pairs_coeff
         self.fitness_count = 0
 
         self.replicated_portion = int(self.gen_size*self.replication_rate)
         self.replicated_portion += self.replicated_portion % 2
+        self.crossed_over_portion = (self.gen_size - self.replicated_portion)//2
 
         # for evaluation, remove all non abc characters
         self.encoded_message = re.sub('[0-9\[\](){}<>;@&^%$!*?,.\n]', '', self.encoded_message)
 
-        self.crossed_over_portion = (self.gen_size - self.replicated_portion)//2
         
 
     def run(self, iterations=None):
@@ -74,10 +86,9 @@ class Algo:
             else:
                 previous_best = solutions[-1].copy()
                 previous_best_count = 0
-            # print(self.fitness_count)
-            if i%50 == 0:
-                print(np.sum(np.std(solutions[:, i]) for i in range(26)))
             i += 1
+        if previous_best_count == 5:
+            print("best solution found!")
             
         return solutions
             
@@ -182,10 +193,13 @@ class Algo:
             message_words.remove("")
 
         score = 0
-        iterable_args = [[word, self.word_set, self.letter_freq, self.pair_freq] for word in message_words]
+        iterable_args = [[word, self.word_set, self.letter_freq, self.pair_freq,
+                          self.word_coeff, self.letter_coeff, self.pairs_coeff]
+                                                    for word in message_words]
 
         ## used eval word to multithread this part
-        score_futures = self.executor.map_async(pickle_eval_word, iterable_args, chunksize=1000)
+        score_futures = self.executor.map_async(pickle_eval_word,
+                                                iterable_args, chunksize=500)
 
         word_scores = np.array(score_futures.get())
         score = np.sum(word_scores)
@@ -277,8 +291,6 @@ class Algo:
         score_index_arr[-1]['score'] = 1
 
         # replicate the best solutions
-        
-
         best_solutions_indices = [score_index_arr[-i]['index'] for i in range(self.replicated_portion)]
         new_solutions = solutions[best_solutions_indices]
         
