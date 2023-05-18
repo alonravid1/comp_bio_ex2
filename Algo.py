@@ -1,29 +1,25 @@
 import numpy as np
-from collections import Counter
 import re
-import time
 
 def pickle_eval_word(args):
     word, word_set, letter_freq, pair_freq = args[:4]
     word_coeff, letter_coeff, pairs_coeff = args[4:]
-
     valid_word = 0
     letter_score = 0
     pair_score = 0
-    
+    length = len(word)
     if word in word_set:
             # criteriea 1: words in dict/words in message
-            valid_word = 1
+            valid_word = length
     for i in range(len(word)):
         # criteriea 2: sum of frequencies of single letters
         letter_score += letter_freq[word[i]]
         if i+1 < len(word):
             # criteriea 3: sum of frequencies of pairs of letters
             pair_score += pair_freq[word[i:i+2]]
-    letter_score
     
-    letter_score = letter_score / len(word)
-    pair_score = pair_score / len(word)
+    letter_score = letter_score / length
+    pair_score = pair_score / length
     score = (word_coeff*valid_word +
             letter_coeff*letter_score + pairs_coeff*pair_score)
     return score
@@ -63,8 +59,23 @@ class Algo:
 
         # for evaluation, remove all non abc characters
         self.encoded_message = re.sub('[0-9\[\](){}<>;@&^%$!*?,.\n]', '', self.encoded_message)
-
         
+    def coverage(self, solution):
+        decrypt_message = self.decode_message(self.encoded_message, solution)
+        message_words = decrypt_message.split(" ")
+        count = 0
+        total = 0
+
+        # remove any empty words
+        for word in message_words:
+            if word != " ":
+                total +=1
+                if word in self.word_set:
+                    count +=1
+
+        return count/total
+
+
 
     def run(self, iterations=None):
         """starts running the algorithm, with the given number of iterations
@@ -79,16 +90,34 @@ class Algo:
         previous_best_count = 0
         previous_best = solutions[-1].copy()
         i = 0
-        while previous_best_count < 5 and i != iterations:
+        while previous_best_count < 20 and i != iterations:
             solutions = self.evolve_new_gen(solutions)
-            if (previous_best == solutions[-1]).all():
+            if (previous_best == solutions[0]).all():
                 previous_best_count += 1
             else:
-                previous_best = solutions[-1].copy()
+                previous_best = solutions[0].copy()
                 previous_best_count = 0
             i += 1
-        if previous_best_count == 5:
-            print("best solution found!")
+
+            if previous_best_count >= 5:
+                # nested if to prevent unnecessary coverage computation
+                if self.coverage(solutions[0]) < 0.9:
+                    # if the last 5 best solutions has not changed
+                    # and there are still many words that are not in the dictionary
+                    # it is a sign of early convergence, and the algorithm will 'reset'.
+                    solutions = self.get_founder_gen()
+                    previous_best_count = 0
+                    previous_best = solutions[-1].copy()
+
+
+            if i%20 == 0:
+                print(f"iteration {i}, score {self.eval_func(solutions[0])}:")
+                print(self.decode_message(self.encoded_message, solutions[0])[:100])
+
+        if previous_best_count == 20:
+            print(f"best solution found at generation {i}, in {self.fitness_count} evaluations")
+            print(self.decode_message(self.encoded_message, solutions[0]))
+
             
         return solutions
             
@@ -192,7 +221,6 @@ class Algo:
         while message_words.count("") != 0:
             message_words.remove("")
 
-        score = 0
         iterable_args = [[word, self.word_set, self.letter_freq, self.pair_freq,
                           self.word_coeff, self.letter_coeff, self.pairs_coeff]
                                                     for word in message_words]
@@ -251,11 +279,11 @@ class Algo:
         score_rank1 = np.searchsorted(score_index_arr['score'], rand1, side='right')
         score_rank2 = np.searchsorted(score_index_arr['score'], rand2, side='right')
 
-        if score_rank1 == 100:
-            score_rank1 = 99
+        # if score_rank1 == 100:
+        #     score_rank1 = 99
 
-        if score_rank2 == 100:
-            score_rank2 = 99
+        # if score_rank2 == 100:
+        #     score_rank2 = 99
 
         return score_rank1, score_rank2
     
@@ -267,38 +295,32 @@ class Algo:
         """
         score_index_arr = np.array([(0, 0) for i in range(self.gen_size)], dtype=[('score', float), ('index', int)])
 
-
         for index in range(self.gen_size):
             score = self.eval_func(solutions[index])
             score_index_arr[index]['index'] = index
             score_index_arr[index]['score'] = score
             
-
+        # turn score into fraction of total scores, for linear sampling
         score_sum = np.sum(score_index_arr['score'])
         score_index_arr['score'] = score_index_arr['score'] / score_sum
-
-        
 
         # sorts the solutions in ascending order
         score_index_arr.sort(order='score')
         
-
-        # make score colmutive
+        # make score colmutive, so sampling can be done with a random number between 0 and 1
         for i in range(1, self.gen_size):
             score_index_arr[i]['score'] = score_index_arr[i]['score'] + score_index_arr[i-1]['score']
 
-        # fixing the last score which is always a tiny error bellow 1
+        # fixing the last score which is sometimes a tiny error bellow 1
         score_index_arr[-1]['score'] = 1
 
         # replicate the best solutions
-        best_solutions_indices = [score_index_arr[-i]['index'] for i in range(self.replicated_portion)]
-        new_solutions = solutions[best_solutions_indices]
-        
+        best_solutions_indices = [score_index_arr[-1]['index'] for i in range(1, self.replicated_portion+1)]
+        new_solutions = solutions[best_solutions_indices].copy()
         
         random_portions = self.rng.random((self.crossed_over_portion,2))
         cross_over_pairs = [self.get_index(rands, score_index_arr) for rands in random_portions]
         
-
         for pair in cross_over_pairs:
             score_rank1, score_rank2 = pair
 
@@ -309,7 +331,6 @@ class Algo:
             index1 = score_index_arr[score_rank1]['index']
             index2 = score_index_arr[score_rank2]['index']
 
-
             sol1, sol2 = self.cross_over(solutions[index1].copy(), solutions[index2].copy())
             self.mutate(sol1)
             self.mutate(sol2)
@@ -318,7 +339,7 @@ class Algo:
 
 
 
-        return(new_solutions)
+        return new_solutions
         
         
 

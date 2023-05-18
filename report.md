@@ -22,10 +22,10 @@ At first I attempted to represent the solutions this way, but after several runs
 
 To evaluate a solution, I applied the permutation as described above on the encoded message, and then I calculated a score based on the number of valid words from the given dictionaries, plus the sum of letter frequencies and the sum of pairs of letters frequencies, summed in the equation:
 
-$score = a \cdot \text{words} + b \cdot \text{letters\_freq} + c \cdot \text{pairs\_freq}$
+$score = a \cdot \text{words / word length} + b \cdot \text{letters\_freq} + c \cdot \text{pairs\_freq}$
 
 
-I played around with some coefficients for each criteriea, and ...
+I played around with the coefficients, and at
 
 ## Evolution of Solutions <a name=evolve></a>
 In order to apply evolutionary pressure over a generation of solutions while creating a greater variance of solutions, 3 rules were applied during the creation of a new generation:

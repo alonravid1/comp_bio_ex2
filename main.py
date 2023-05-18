@@ -33,13 +33,13 @@ if __name__ == "__main__":
             freq, pair = line.split("\t")
             pair_freq[pair.lower()] = float(freq)
 
-    gen_size = 400
-    replication_rate = 0.05
+    gen_size = 200
+    replication_rate = 0.1
     cross_over_rate = 1-replication_rate
     mutation_rate = 0.05
-    word_coeff = 10
-    letter_coeff = 4
-    pair_coeff = 1
+    word_coeff = 20
+    letter_coeff = 5
+    pair_coeff = 13
     
     mp.set_start_method('spawn')
     with mp.Pool(60) as executor:
@@ -52,12 +52,12 @@ if __name__ == "__main__":
         genetic_algo = Algo(*algo_settings)
         
         start = time.time()
-        solutions = genetic_algo.run(450)
+        solutions = genetic_algo.run()
         
         end = time.time()
         plain_text = genetic_algo.decode_message(enc_mess, solutions[-1])
-        print(plain_text)
-        print(alphabet[solutions[-1]])
+        # print(plain_text)
+        # print(alphabet[solutions[-1]])
         
         
     with open("perm.txt", 'w+') as gen_perm:
