@@ -1,16 +1,16 @@
 a y
 b x
-c d
+c i
 d n
 e t
 f o
 g z
 h j
 i c
-j g
+j e
 k b
 l l
-m e
+m d
 n u
 o k
 p m
@@ -21,6 +21,6 @@ t q
 u r
 v h
 w w
-x i
+x g
 y a
 z f

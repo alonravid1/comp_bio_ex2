@@ -1,36 +1,14 @@
 import numpy as np
 import re
 
-def pickle_eval_word(args):
-    word, word_set, letter_freq, pair_freq = args[:4]
-    word_coeff, letter_coeff, pairs_coeff = args[4:]
-    valid_word = 0
-    letter_score = 0
-    pair_score = 0
-    length = len(word)
-    if word in word_set:
-            # criteriea 1: words in dict/words in message
-            valid_word = length
-    for i in range(len(word)):
-        # criteriea 2: sum of frequencies of single letters
-        letter_score += letter_freq[word[i]]
-        if i+1 < len(word):
-            # criteriea 3: sum of frequencies of pairs of letters
-            pair_score += pair_freq[word[i:i+2]]
+
     
-    letter_score = letter_score / length
-    pair_score = pair_score / length
-    score = (word_coeff*valid_word +
-            letter_coeff*letter_score + pairs_coeff*pair_score)
-    return score
-    
-    
-class Algo:
+class GeneticAlgo:
     
     def __init__(self, enc_message, letter_freq, pair_freq,
                  word_set, replication_rate, cross_over_rate,
-                 mutation_rate, gen_size, executor, word_coeff,
-                 letter_coeff, pairs_coeff):
+                 mutation_rate, gen_size, executor, word_eval_func,
+                 word_coeff, letter_coeff, pairs_coeff):
         
         self.alphabet = np.array([chr(i) for i in range(ord('a'), ord('z') + 1)])
         self.sol_rep = np.arange(26)
@@ -48,6 +26,8 @@ class Algo:
         
         self.rng = np.random.default_rng(7)
         self.executor = executor
+        self.word_eval_func = word_eval_func
+        
         self.word_coeff = word_coeff
         self.letter_coeff = letter_coeff
         self.pairs_coeff = pairs_coeff
@@ -76,7 +56,6 @@ class Algo:
         return count/total
 
 
-
     def run(self, iterations=None):
         """starts running the algorithm, with the given number of iterations
 
@@ -88,9 +67,9 @@ class Algo:
         """
         solutions = self.get_founder_gen()
         previous_best_count = 0
-        previous_best = solutions[-1].copy()
+        previous_best = solutions[0].copy()
         i = 0
-        while previous_best_count < 20 and i != iterations:
+        while previous_best_count < 10 and i != iterations:
             solutions = self.evolve_new_gen(solutions)
             if (previous_best == solutions[0]).all():
                 previous_best_count += 1
@@ -101,25 +80,33 @@ class Algo:
 
             if previous_best_count >= 5:
                 # nested if to prevent unnecessary coverage computation
-                if self.coverage(solutions[0]) < 0.9:
+                if self.coverage(solutions[0]) < 0.6:
                     # if the last 5 best solutions has not changed
                     # and there are still many words that are not in the dictionary
                     # it is a sign of early convergence, and the algorithm will 'reset'.
                     solutions = self.get_founder_gen()
                     previous_best_count = 0
-                    previous_best = solutions[-1].copy()
+                    previous_best = solutions[0].copy()
+                elif self.coverage(solutions[0]) < 0.9:
+                    # if the best solution hasnt improved for the past 5
+                    # generations but there is only a small portion
+                    # of invalid words, increase mutation rate to overcome
+                    # local maxima near the global one, and give pair frequency
+                    # a higher weight.
+                    previous_best_count = 0
+                    self.mutation_rate += 0.03
+                    self.pairs_coeff = 15
+                    self.letter_coeff = 1
 
-
+                    print(f"changed mode at iteration {i}")
+                    
             if i%20 == 0:
                 print(f"iteration {i}, score {self.eval_func(solutions[0])}:")
                 print(self.decode_message(self.encoded_message, solutions[0])[:100])
 
-        if previous_best_count == 20:
-            print(f"best solution found at generation {i}, in {self.fitness_count} evaluations")
-            print(self.decode_message(self.encoded_message, solutions[0]))
-
-            
-        return solutions
+        print(f"best solution found at generation {i}, in {self.fitness_count} evaluations")
+        print(self.decode_message(self.encoded_message, solutions[0]))
+        return solutions[0], self.fitness_count
             
     
     def validate_solution(self, solution):
@@ -226,7 +213,7 @@ class Algo:
                                                     for word in message_words]
 
         ## used eval word to multithread this part
-        score_futures = self.executor.map_async(pickle_eval_word,
+        score_futures = self.executor.map_async(self.word_eval_func,
                                                 iterable_args, chunksize=500)
 
         word_scores = np.array(score_futures.get())
@@ -278,12 +265,6 @@ class Algo:
         rand1, rand2 = rands[0], rands[1]
         score_rank1 = np.searchsorted(score_index_arr['score'], rand1, side='right')
         score_rank2 = np.searchsorted(score_index_arr['score'], rand2, side='right')
-
-        # if score_rank1 == 100:
-        #     score_rank1 = 99
-
-        # if score_rank2 == 100:
-        #     score_rank2 = 99
 
         return score_rank1, score_rank2
     
