@@ -1,5 +1,7 @@
 import numpy as np
 from GeneticAlgo import GeneticAlgo
+from DarwinAlgo import DarwinAlgo
+from LamarckAlgo import LamarckAlgo
 import time
 import multiprocessing as mp
 
@@ -67,7 +69,8 @@ if __name__ == "__main__":
     mp.set_start_method('spawn')
     # params = [[20, 5, 13], [20, 13, 5],[10, 7, 3],[10, 3, 7],
     #          [10, 3, 1], [5, 3, 1],[5, 1, 0],[3, 1, 0],[1, 0, 0]]
-    params = [75, 100, 125, 150, 200, 250, 300]
+    # params = [75, 100, 125, 150, 200, 250, 300]
+    params = [150]
     with mp.Pool(60) as executor:
         for param in params:
             # word_coeff, letter_coeff ,pair_coeff = param
@@ -76,10 +79,10 @@ if __name__ == "__main__":
                             replication_rate, cross_over_rate,
                             mutation_rate, gen_size, executor,
                             pickle_eval_word, word_coeff, 
-                            letter_coeff, pair_coeff]
+                            letter_coeff, pair_coeff, 5]
                 
 
-            genetic_algo = GeneticAlgo(*algo_settings)
+            genetic_algo = DarwinAlgo(*algo_settings)
             
             start = time.time()
             solution, fitness_count = genetic_algo.run()

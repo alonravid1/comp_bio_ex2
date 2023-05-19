@@ -1,7 +1,6 @@
 import numpy as np
 import re
 
-
     
 class GeneticAlgo:
     

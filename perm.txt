@@ -4,8 +4,8 @@ c i
 d n
 e t
 f o
-g z
-h j
+g q
+h p
 i c
 j e
 k b
@@ -16,8 +16,8 @@ o k
 p m
 q s
 r v
-s p
-t q
+s z
+t j
 u r
 v h
 w w
