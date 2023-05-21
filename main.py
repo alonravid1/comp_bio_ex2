@@ -5,9 +5,31 @@ from LamarckAlgo import LamarckAlgo
 import time
 import multiprocessing as mp
 
-def pickle_eval_word(args):
-    word, word_set, letter_freq, pair_freq = args[:4]
-    word_coeff, letter_coeff, pairs_coeff = args[4:]
+def pickle_eval_word(word, word_set, letter_freq, pair_freq,
+                     word_coeff, letter_coeff, pairs_coeff):
+    """the function evaluates a single word's score according to
+    wether or not it appears in the given dictionary, its length and
+    letter and pairs of letters' frequency.
+    
+    it is sent to the algorithms through the main due to the fact that
+    the solution evaluation function uses multiprocessing to go over multiple
+    words at once and greatly reduce runtime, but for a function to be used
+    in multiprocessing it must be pickleable, which can be achived by defining
+    it in the first indent level.
+
+    Args:
+        word (string): a word to be evaluated
+        word_set (set): a set of valid words
+        letter_freq (dict): a dictionary of characters and their frequency
+        pair_freq (dict): a dictionary of pairs of characters and their frequency
+        word_coeff (float): coefficient of word score
+        letter_coeff (float): coefficient of letter frequency score
+        pairs_coeff (float): coefficient of letter pairs frequency score
+
+    Returns:
+        score: a number representing a word's score
+    """
+
     valid_word = 0
     letter_score = 0
     pair_score = 0

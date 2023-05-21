@@ -8,6 +8,24 @@ class GeneticAlgo:
                  word_set, replication_rate, cross_over_rate,
                  mutation_rate, gen_size, executor, word_eval_func,
                  word_coeff, letter_coeff, pairs_coeff):
+        """sets all parameters of the algorithm, generates any independent
+        variables such as the rng object and solution representation.
+
+        Args:
+            enc_message (string): an encoded message
+            letter_freq (dict): a dictionary of characters and their frequency
+            pair_freq (dict): a dictionary of pairs of characters and their frequency
+            word_set (set): a set of valid words
+            replication_rate (float): portion of generation which is replicated as is to the next
+            cross_over_rate (float): portion of generation which is crossed over
+            mutation_rate (float): chance for a single letter in a solution to be mutated
+            gen_size (int): number of soluttions in  a generation
+            executor (process pool): a pool of processes for multiprocessing words
+            word_eval_func (function): a picklable function which evaluates a word
+            word_coeff (float): coefficient of word score
+            letter_coeff (float): coefficient of letter frequency score
+            pairs_coeff (float): coefficient of letter pairs frequency score
+        """
         
         self.alphabet = np.array([chr(i) for i in range(ord('a'), ord('z') + 1)])
         self.sol_rep = np.arange(26)
@@ -40,6 +58,14 @@ class GeneticAlgo:
         self.encoded_message = re.sub('[0-9\[\](){}<>;@&^%$!*?,.\n]', '', self.encoded_message)
         
     def coverage(self, solution):
+        """calculate the coverage of valid words out of the words in a solution
+
+        Args:
+            solution (np.array): an array of integers between 0 and 25 representing the alphabet
+
+        Returns:
+            float: portion coverage
+        """
         decrypt_message = self.decode_message(self.encoded_message, solution)
         message_words = decrypt_message.split(" ")
         count = 0
@@ -59,7 +85,7 @@ class GeneticAlgo:
         """starts running the algorithm, with the given number of iterations
 
         Args:
-            iterations (int): number of iterations
+            iterations (int, optional): number of iterations to run
 
         Returns:
             list: a list of solutions, sorted in ascending order
@@ -113,7 +139,7 @@ class GeneticAlgo:
         replacing one instance of a letter appearing twice with a missing letter
 
         Args:
-            solution (solution): solution representation
+            solution (np.array): an array of numbers representing a character in the alphabet
         """
 
         double_letters = []
@@ -222,10 +248,11 @@ class GeneticAlgo:
     
     
     def mutate(self, solution):
-        """_summary_
+        """for each letter in the solution, apply a random
+        chance to mutate and swap it with another.
 
         Args:
-            solution (_type_): _description_
+            solution (np.array): an array of integers between 0 and 25 representing the alphabet
         """
         for i in range(26):
             rand = self.rng.random(1)
@@ -252,14 +279,26 @@ class GeneticAlgo:
     
     
     def get_index(self, rands, score_index_arr):
-        """_summary_
+        """the function recieves two random numbers between 0 and 1, and an array
+        which holds the solutions's scores after they have been scaled proportionally
+        between 0 and 1, and to summing up to 1, then the array was sorted and each
+        score's value was calculated as a cumultation of the previous scores.
+        
+        this means that each between any two solutions was a section
+        between 0 to 1 proportional to the second's proportional score,
+        which is also the chance for a random number to be between the two numbers.
+        
+        this results in the chance for picking an indice using the random numbers being
+        equal to the solution's score proportion.
 
         Args:
-            rands (_type_): _description_
-            score_index_arr (_type_): _description_
+            rands (float, float): two random numbers between 0 and 1
+            score_index_arr (np.array):  array sorted by each solution's proportional
+            score and holds its score and index in the original solutions array.
 
         Returns:
-            _type_: _description_
+            int, int: a pair indicies of solutions where the the random numbers
+            would be placed in the columative scores array. 
         """
         rand1, rand2 = rands[0], rands[1]
         score_rank1 = np.searchsorted(score_index_arr['score'], rand1, side='right')
