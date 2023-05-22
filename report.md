@@ -11,11 +11,11 @@ In this report I will detail my implementation of a genetic algorithm which decr
 
 In addition to these files, the algorithm will be tested on a range of parameters:
 * Generation Size
-* 
 * Replication Rate
-* Cross Over Policy
+* Crossover Rate
 * Mutation Rate
 * Score Variables Coefficients
+* Algorithm Type
 
 
 ## Solution Representation and Evaluation <a name=sol></a>
@@ -27,9 +27,6 @@ At first I attempted to represent the solutions this way, but after several runs
 To evaluate a solution, I applied the permutation as described above on the encoded message, and then I calculated a solution's score by evaluating each word and summing their scores. A word's score was calculated based on whether or not it was a valid word from the given dictionaries, the sum of its letter frequencies and the sum of pairs of letters frequencies, each multiplyed by a parameter coefficient as described in the following equation:
 
 $score = a \cdot 1_{is\_valid\_word} \cdot word\_length + b \cdot \text{letters\_freq} + c \cdot \text{pairs\_freq}$
-
-
-I played around with the coefficients, and at
 
 ## Evolution of Solutions <a name=evolve></a>
 In order to apply evolutionary pressure over a generation of solutions while creating a greater variance of solutions, 3 rules were applied during the creation of a new generation:
@@ -43,12 +40,15 @@ The crossing over was applied by taking two arrays, randomly generating a number
 Afterwards, the solutions's validty was checked and fixed by searching for double letter and missing letters that can be created this way, swapping the first instace of a double letter with a missing letter.
 
 ## Early Convergance Problem and Halting<a name=conv></a>
-A problem facing a genetic algorithm is a similar one to an early convergence to a local maximum. Because a solution with the highest score is replicated and a solution's chance to be chosen for crossover is defined as the porportion of its score to the total score of all solutions, the highest scoring ones can replace the majority of other solutions.
+A problem facing genetic algorithms is an early convergence to a local maximum point. Because the solution with the highest score is replicated multiple times at the next generation, and a solution's chance to be chosen for crossover is defined as the porportion of its score to the total score of all solutions, the highest scoring ones can replace the majority of other solutions.
 
-When this happens, we remain with a much less diverse population which is concentrated around a local maximum, without the abilty to overcome it and becoming stuck there. In order to overcome this problem, I programmed the algorithm to follow the following logic:
+When this happens, we remain with a much less diverse population which is concentrated around a local maximum, without the abilty to overcome it and thus becoming stuck there. In order to overcome this problem, I programmed the algorithm to follow the following logic:
 
 Check wether the best solution had changed in the last 5 generation. If not, calculate the coverage of valid words over the decoded message words:
-* If the coverage is lower than 50%, that means the best solution is stuck but the current solution is far from the optimal one, since a large majority of words in the message can be found in the dictionary. In this case the algorithm "resets", generating a new random generation and continuing from there to the next generation.
-* If the coverage is lower than 90% but above 50%, that means in most likelihood that the current solution is good, but a few words with the less frequent letters which are still wrong. To correct this slight difference, letter pairs frequency's coefficient is increased, and the single letter's is decreased, with mutation rate increasing as well to diversify the solution space in hope of getting the last few letter swaps required.
+* If the coverage is lower than 50%, that means the best solution is stuck but the current solution is far from the optimal one, since a large majority of  the message's words should be found in the dictionary. In this case the algorithm "resets", generating a new random generation and continues from there to the next generation, without reseting the fitness count.
+* If the coverage is lower than 90% but above 50%, that means in most likelihood that the current solution is good, but has a few words with less frequent letters which are still wrong. To correct this slight difference, the letter pairs frequency's coefficient is increased, and the single letter's is decreased, with mutation rate increasing as well to diversify the solution space in hope of getting the last few letter swaps required.
 
 The algorithm stops running and returns the current best solution once it has not changed for the last 10 generations, and the coverage is higher than 90%.
+
+## Algorithm Analysis<a name=algo></a>
+At first I 

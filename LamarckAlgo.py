@@ -73,13 +73,16 @@ class LamarckAlgo(GeneticAlgo):
             score_index_arr[index]['index'] = index
             score_index_arr[index]['score'] = score
             
+        # sorts the solutions in ascending order
+        score_index_arr.sort(order='score')
+        # get statistics
+        max_score = score_index_arr[-1]['score']
+        avg_score = np.mean(score_index_arr['score'])
+        
         # turn score into fraction of total scores, for linear sampling
         score_sum = np.sum(score_index_arr['score'])
         score_index_arr['score'] = score_index_arr['score'] / score_sum
 
-        # sorts the solutions in ascending order
-        score_index_arr.sort(order='score')
-        
         # make score colmutive, so sampling can be done with a random number between 0 and 1
         for i in range(1, self.gen_size):
             score_index_arr[i]['score'] = score_index_arr[i]['score'] + score_index_arr[i-1]['score']
@@ -110,5 +113,5 @@ class LamarckAlgo(GeneticAlgo):
             new_solutions = np.concatenate((new_solutions, [sol1]), axis=0)
             new_solutions = np.concatenate((new_solutions, [sol2]), axis=0)
             
-        return new_solutions
+        return new_solutions, avg_score, max_score
         

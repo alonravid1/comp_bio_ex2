@@ -2,16 +2,15 @@ import numpy as np
 from GeneticAlgo import GeneticAlgo
 from DarwinAlgo import DarwinAlgo
 from LamarckAlgo import LamarckAlgo
-import time
+import matplotlib.pyplot as plt
 import multiprocessing as mp
 
-def pickle_eval_word(word, word_set, letter_freq, pair_freq,
-                     word_coeff, letter_coeff, pairs_coeff):
+def pickle_eval_word(args):
     """the function evaluates a single word's score according to
     wether or not it appears in the given dictionary, its length and
     letter and pairs of letters' frequency.
     
-    it is sent to the algorithms through the main due to the fact that
+    it is sent to the algorithms through main due to the fact that
     the solution evaluation function uses multiprocessing to go over multiple
     words at once and greatly reduce runtime, but for a function to be used
     in multiprocessing it must be pickleable, which can be achived by defining
@@ -29,7 +28,8 @@ def pickle_eval_word(word, word_set, letter_freq, pair_freq,
     Returns:
         score: a number representing a word's score
     """
-
+    word, word_set, letter_freq, pair_freq = args[:4]
+    word_coeff, letter_coeff, pairs_coeff = args[4:]
     valid_word = 0
     letter_score = 0
     pair_score = 0
@@ -50,6 +50,14 @@ def pickle_eval_word(word, word_set, letter_freq, pair_freq,
             letter_coeff*letter_score + pairs_coeff*pair_score)
     return score
     
+def graph_stats(stats):
+    avg_score_data = stats['avg']
+    max_score_data = stats['max']
+    iterations = np.arange(stats.size)
+    plt.plot(iterations, avg_score_data, color='g', label="average score")
+    plt.plot(iterations, max_score_data, color='r', label="max score")
+    plt.legend()
+    plt.show()
 
 if __name__ == "__main__":
     
@@ -89,33 +97,33 @@ if __name__ == "__main__":
     pair_coeff = 13
     
     mp.set_start_method('spawn')
-    # params = [[20, 5, 13], [20, 13, 5],[10, 7, 3],[10, 3, 7],
-    #          [10, 3, 1], [5, 3, 1],[5, 1, 0],[3, 1, 0],[1, 0, 0]]
+    params = [[10, 7, 3],[10, 3, 7],
+             [10, 3, 1], [5, 3, 1],[5, 1, 0],[3, 1, 0],[1, 0, 0]]
     # params = [75, 100, 125, 150, 200, 250, 300]
-    params = [150]
+    with open("param_results.csv", 'a') as res:
+        res.write("word_coeff,letter_coeff,pair_coeff,fitness_count,score,cover:\n")
+        
     with mp.Pool(60) as executor:
         for param in params:
-            # word_coeff, letter_coeff ,pair_coeff = param
-            gen_size = param
+            word_coeff, letter_coeff ,pair_coeff = param
+            # gen_size = param
             algo_settings = [enc_mess, letter_freq, pair_freq, words,
                             replication_rate, cross_over_rate,
                             mutation_rate, gen_size, executor,
                             pickle_eval_word, word_coeff, 
-                            letter_coeff, pair_coeff, 5]
+                            letter_coeff, pair_coeff]
                 
 
-            genetic_algo = DarwinAlgo(*algo_settings)
+            genetic_algo = GeneticAlgo(*algo_settings)
             
-            start = time.time()
-            solution, fitness_count = genetic_algo.run()
-            
-            end = time.time()
+            solution, fitness_count, stats = genetic_algo.run()
+            # graph_stats(stats)
             plain_text = genetic_algo.decode_message(enc_mess, solution)
             score = genetic_algo.eval_func(solution)
             cover = genetic_algo.coverage(solution)
             with open("param_results.csv", 'a') as res:
-                # res.write(f"{word_coeff},{letter_coeff},{pair_coeff},{fitness_count}\n")
-                res.write(f"{gen_size},{fitness_count},{score},{cover}")
+                res.write(f"{word_coeff},{letter_coeff},{pair_coeff},{fitness_count},{score},{cover}\n")
+                # res.write(f"{gen_size},{fitness_count},{score},{cover}\n")
         
     with open("perm.txt", 'w+') as gen_perm:
         for i in range(len(solution)):
@@ -124,5 +132,4 @@ if __name__ == "__main__":
     with open("plain.txt", 'w+') as gen_sol:
         gen_sol.write(plain_text)
         
-    print(end-start)
    

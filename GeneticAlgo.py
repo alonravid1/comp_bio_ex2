@@ -94,15 +94,17 @@ class GeneticAlgo:
         previous_best_count = 0
         previous_best = solutions[0].copy()
         i = 0
+        score_stats = np.array([(0,0)], dtype=[('max', float), ('avg', float)])
         while previous_best_count < 10 and i != iterations:
-            solutions = self.evolve_new_gen(solutions)
+            solutions, avg_score, max_score = self.evolve_new_gen(solutions)
+            new_val = np.array([(max_score, avg_score)], dtype=[('max', float), ('avg', float)])
+            score_stats = np.append(score_stats, new_val)
             if (previous_best == solutions[0]).all():
                 previous_best_count += 1
             else:
                 previous_best = solutions[0].copy()
                 previous_best_count = 0
             i += 1
-
             if previous_best_count >= 5:
                 # nested if to prevent unnecessary coverage computation
                 if self.coverage(solutions[0]) < 0.6:
@@ -123,15 +125,14 @@ class GeneticAlgo:
                     self.pairs_coeff = 15
                     self.letter_coeff = 1
 
-                    print(f"changed mode at iteration {i}")
+                    # print(f"changed mode at iteration {i}")
                     
             if i%20 == 0:
                 print(f"iteration {i}, score {self.eval_func(solutions[0])}:")
                 print(self.decode_message(self.encoded_message, solutions[0])[:100])
 
-        print(f"best solution found at generation {i}, in {self.fitness_count} evaluations")
-        print(self.decode_message(self.encoded_message, solutions[0]))
-        return solutions[0], self.fitness_count
+        print(f"best solution found at generation {i}, in {self.fitness_count} evaluations")        
+        return solutions[0], self.fitness_count, score_stats
             
     
     def validate_solution(self, solution):
@@ -319,12 +320,15 @@ class GeneticAlgo:
             score_index_arr[index]['index'] = index
             score_index_arr[index]['score'] = score
             
+        # sorts the solutions in ascending order
+        score_index_arr.sort(order='score')
+        # get statistics
+        max_score = score_index_arr[-1]['score']
+        avg_score = np.mean(score_index_arr['score'])
+        
         # turn score into fraction of total scores, for linear sampling
         score_sum = np.sum(score_index_arr['score'])
         score_index_arr['score'] = score_index_arr['score'] / score_sum
-
-        # sorts the solutions in ascending order
-        score_index_arr.sort(order='score')
         
         # make score colmutive, so sampling can be done with a random number between 0 and 1
         for i in range(1, self.gen_size):
@@ -356,11 +360,4 @@ class GeneticAlgo:
             new_solutions = np.concatenate((new_solutions, [sol1]), axis=0)
             new_solutions = np.concatenate((new_solutions, [sol2]), axis=0)
 
-
-
-        return new_solutions
-        
-        
-
-
-            
+        return new_solutions, avg_score, max_score
