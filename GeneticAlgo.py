@@ -7,7 +7,7 @@ class GeneticAlgo:
     
     def __init__(self, enc_message, letter_freq, pair_freq,
                  word_set, replication_rate, cross_over_rate,
-                 mutation_rate, gen_size, executor, word_eval_func,
+                 mutation_rate, gen_size,
                  word_coeff, letter_coeff, pairs_coeff):
         """sets all parameters of the algorithm, generates any independent
         variables such as the rng object and solution representation.
@@ -21,8 +21,6 @@ class GeneticAlgo:
             cross_over_rate (float): portion of generation which is crossed over
             mutation_rate (float): chance for a single letter in a solution to be mutated
             gen_size (int): number of soluttions in  a generation
-            executor (process pool): a pool of processes for multiprocessing words
-            word_eval_func (function): a picklable function which evaluates a word
             word_coeff (float): coefficient of word score
             letter_coeff (float): coefficient of letter frequency score
             pairs_coeff (float): coefficient of letter pairs frequency score
@@ -43,9 +41,7 @@ class GeneticAlgo:
         self.gen_size = gen_size + (gen_size % 2)
         
         self.rng = np.random.default_rng(7)
-        self.executor = executor
-        self.word_eval_func = word_eval_func
-        
+
         self.word_coeff = word_coeff
         self.letter_coeff = letter_coeff
         self.pairs_coeff = pairs_coeff
@@ -109,7 +105,6 @@ class GeneticAlgo:
                 previous_best_count = 0
 
             i += 1
-
             if previous_best_count >= 10:
                 # nested if to prevent unnecessary coverage computation
                 if self.coverage(solutions[0]) < 0.6:
@@ -267,16 +262,6 @@ class GeneticAlgo:
             if word in self.word_set:
                 valid_words += 1
 
-        # iterable_args = [[word, self.word_set, self.letter_freq, self.pair_freq,
-        #                   self.word_coeff, self.letter_coeff, self.pairs_coeff]
-        #                                             for word in message_words]
-
-        # ## used eval word to multithread this part
-        # score_futures = self.executor.map_async(self.word_eval_func,
-        #                                         iterable_args, chunksize=500)
-
-        # word_scores = np.array(score_futures.get())
-        # score = np.sum(word_scores)
         letter_count = Counter(decrypt_message)
         pair_count = self.count_pairs(decrypt_message)
         word_score = valid_words / len(message_words)
@@ -308,7 +293,7 @@ class GeneticAlgo:
                 temp = solution[i].copy()
                 solution[i] = solution[swap]
                 solution[swap] = temp
-
+                
             
     def get_founder_gen(self):
         """generate random solutions by shuffling representation arrays
@@ -367,6 +352,11 @@ class GeneticAlgo:
             
         # sorts the solutions in ascending order
         score_index_arr.sort(order='score')
+
+        # make sure all values are positive
+        if score_index_arr[0]['score'] < 0:
+            score_index_arr['score'] -= score_index_arr[0]['score'] 
+            
         # get statistics
         max_score = score_index_arr[-1]['score']
         avg_score = np.mean(score_index_arr['score'])
@@ -383,7 +373,7 @@ class GeneticAlgo:
         score_index_arr[-1]['score'] = 1
 
         # replicate the best solutions
-        best_solutions_indices = [score_index_arr[-1]['index'] for i in range(1, self.replicated_portion+1)]
+        best_solutions_indices = [score_index_arr[-i]['index'] for i in range(1, self.replicated_portion+1)]
         new_solutions = solutions[best_solutions_indices].copy()
         
         random_portions = self.rng.random((self.crossed_over_portion,2))
