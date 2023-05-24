@@ -49,7 +49,15 @@ def pickle_eval_word(args):
     score = (word_coeff*valid_word +
             letter_coeff*letter_score + pairs_coeff*pair_score)
     return score
-    
+
+def encode_message(message, alphabet):
+    rng = np.random.default_rng(7)
+    permutaion = rng.permutation(alphabet)
+    table = str.maketrans("".join(alphabet), "".join(permutaion))
+    new_message = message.translate(table)
+    return new_message
+
+
 def graph_stats(stats):
     avg_score_data = stats['avg']
     max_score_data = stats['max']
@@ -88,24 +96,40 @@ if __name__ == "__main__":
             freq, pair = line.split("\t")
             pair_freq[pair.lower()] = float(freq)
 
-    gen_size = 150
+    gen_size = 100
     replication_rate = 0.1
     cross_over_rate = 1-replication_rate
     mutation_rate = 0.04
     word_coeff = 20
     letter_coeff = 5
-    pair_coeff = 13
-    
+    pair_coeff = 1
+
+    # enc_mess = encode_message(enc_mess, alphabet)
+
     mp.set_start_method('spawn')
-    params = [[10, 7, 3],[10, 3, 7],
-             [10, 3, 1], [5, 3, 1],[5, 1, 0],[3, 1, 0],[1, 0, 0]]
+    # params = [[20, 5, 13]]
+    # params = [[10, 7, 3],[10, 3, 7],
+    #          [10, 3, 1], [5, 3, 1],[5, 1, 0],[3, 1, 0],[1, 0, 0]]
     # params = [75, 100, 125, 150, 200, 250, 300]
     with open("param_results.csv", 'a') as res:
         res.write("word_coeff,letter_coeff,pair_coeff,fitness_count,score,cover:\n")
-        
+    
+    # executor = None
+    # algo_settings = [enc_mess, letter_freq, pair_freq, words,
+    #                         replication_rate, cross_over_rate,
+    #                         mutation_rate, gen_size, executor,
+    #                         pickle_eval_word, word_coeff, 
+    #                         letter_coeff, pair_coeff]
+                
+
+    # genetic_algo = GeneticAlgo(*algo_settings)
+    # solution, fitness_count, stats = genetic_algo.run(1)
+    # print(alphabet[solution])
+    # print(genetic_algo.eval_func(solution))
+    # exit()
     with mp.Pool(60) as executor:
-        for param in params:
-            word_coeff, letter_coeff ,pair_coeff = param
+        # for param in params:
+            # word_coeff, letter_coeff ,pair_coeff = param
             # gen_size = param
             algo_settings = [enc_mess, letter_freq, pair_freq, words,
                             replication_rate, cross_over_rate,
@@ -121,6 +145,7 @@ if __name__ == "__main__":
             plain_text = genetic_algo.decode_message(enc_mess, solution)
             score = genetic_algo.eval_func(solution)
             cover = genetic_algo.coverage(solution)
+
             with open("param_results.csv", 'a') as res:
                 res.write(f"{word_coeff},{letter_coeff},{pair_coeff},{fitness_count},{score},{cover}\n")
                 # res.write(f"{gen_size},{fitness_count},{score},{cover}\n")

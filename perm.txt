@@ -4,8 +4,8 @@ c i
 d n
 e t
 f o
-g z
-h j
+g j
+h z
 i c
 j e
 k b

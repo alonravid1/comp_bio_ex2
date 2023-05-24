@@ -1,6 +1,7 @@
 import numpy as np
 import re
-
+from collections import Counter
+import time
     
 class GeneticAlgo:
     
@@ -95,17 +96,21 @@ class GeneticAlgo:
         previous_best = solutions[0].copy()
         i = 0
         score_stats = np.array([(0,0)], dtype=[('max', float), ('avg', float)])
+
         while previous_best_count < 10 and i != iterations:
             solutions, avg_score, max_score = self.evolve_new_gen(solutions)
             new_val = np.array([(max_score, avg_score)], dtype=[('max', float), ('avg', float)])
             score_stats = np.append(score_stats, new_val)
+
             if (previous_best == solutions[0]).all():
                 previous_best_count += 1
             else:
                 previous_best = solutions[0].copy()
                 previous_best_count = 0
+
             i += 1
-            if previous_best_count >= 5:
+
+            if previous_best_count >= 10:
                 # nested if to prevent unnecessary coverage computation
                 if self.coverage(solutions[0]) < 0.6:
                     # if the last 5 best solutions has not changed
@@ -122,7 +127,7 @@ class GeneticAlgo:
                     # a higher weight.
                     previous_best_count = 0
                     self.mutation_rate += 0.03
-                    self.pairs_coeff = 15
+                    self.pairs_coeff = 10
                     self.letter_coeff = 1
 
                     # print(f"changed mode at iteration {i}")
@@ -213,6 +218,27 @@ class GeneticAlgo:
         
         return new_message
 
+    def count_pairs(self, string):
+        """Counts the number of pairs of letters in a string and outputs them as a dictionary.
+
+        Args:
+            string: The string to count pairs of letters in.
+
+        Returns:
+            A dictionary that maps each pair of letters to its count.
+        """
+        
+        # create an empty dictionary to store the counts of each pair of letters.
+        pairs_count = {}
+        new_string = string.replace(" ", "")
+        i = 0
+        for char1 in self.alphabet:
+            for char2 in self.alphabet:
+                pairs_count[char1 + char2] = new_string.count(char1 + char2)
+                i += new_string.count(char1 + char2)
+
+        return pairs_count
+
     
     def eval_func(self, solution):
         """evaluation function for solutions, calculating the number
@@ -227,23 +253,42 @@ class GeneticAlgo:
         """
         self.fitness_count += 1
         decrypt_message = self.decode_message(self.encoded_message, solution)
-
+        spaces = decrypt_message.count(" ")
+        length = len(decrypt_message) - spaces
         message_words = decrypt_message.split(" ")
 
         # remove any empty words
         while message_words.count("") != 0:
             message_words.remove("")
+        
+        valid_words = 0
 
-        iterable_args = [[word, self.word_set, self.letter_freq, self.pair_freq,
-                          self.word_coeff, self.letter_coeff, self.pairs_coeff]
-                                                    for word in message_words]
+        for word in message_words:
+            if word in self.word_set:
+                valid_words += 1
 
-        ## used eval word to multithread this part
-        score_futures = self.executor.map_async(self.word_eval_func,
-                                                iterable_args, chunksize=500)
+        # iterable_args = [[word, self.word_set, self.letter_freq, self.pair_freq,
+        #                   self.word_coeff, self.letter_coeff, self.pairs_coeff]
+        #                                             for word in message_words]
 
-        word_scores = np.array(score_futures.get())
-        score = np.sum(word_scores)
+        # ## used eval word to multithread this part
+        # score_futures = self.executor.map_async(self.word_eval_func,
+        #                                         iterable_args, chunksize=500)
+
+        # word_scores = np.array(score_futures.get())
+        # score = np.sum(word_scores)
+        letter_count = Counter(decrypt_message)
+        pair_count = self.count_pairs(decrypt_message)
+        word_score = valid_words / len(message_words)
+        letter_score = 0
+        pair_score = 0
+
+        for char1 in self.alphabet:
+            letter_score += abs(letter_count[char1]/length - self.letter_freq[char1])/len(self.alphabet)
+            for char2 in self.alphabet:
+                pair_score += abs(pair_count[char1+char2]/(length-1) - self.pair_freq[char1+char2])/(len(self.alphabet))**2
+        score = (self.word_coeff*word_score -
+                self.letter_coeff*letter_score - self.pairs_coeff*pair_score)
 
         return score
     

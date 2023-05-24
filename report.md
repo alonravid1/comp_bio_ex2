@@ -52,3 +52,16 @@ The algorithm stops running and returns the current best solution once it has no
 
 ## Algorithm Analysis<a name=algo></a>
 At first I 
+
+### Coefficients Testing
+| word_coeff | letter_coeff | pair_coeff | fitness_count | score | cover |
+|---|---|---|---|---|---|
+| 20 | 5 | 13 | 15305 | 105239.43 | 0.992 |
+| 20 | 13 | 5 | 73074 | 100264.33 | 0.928 |
+| 10 | 7 | 3 | 94831 | 52519.43 | 0.990 |
+| 10 | 3 | 7 | 20406 | 52219.43| 0.987 |
+| 10 | 3 | 1 | 118689 | 52012.81 | 0.982|
+| 5 | 3 | 1 | 18756 | 26444.43 | 0.992 |
+| 5 | 1 | 0 | 14704 | 22716.67 | 0.912 |
+| 3 | 1 | 0 | 55818 | 15587.41 | 0.979 |
+| 1 | 0 | 0 | 61220 | 5432.43 | 0.992 |
