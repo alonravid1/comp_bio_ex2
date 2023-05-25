@@ -92,6 +92,7 @@ if __name__ == "__main__":
     replication_rate = 0.1
     cross_over_rate = 1-replication_rate
     mutation_rate = 0.04
+    mutation_number = 3
     word_coeff = 20
     letter_coeff = 5
     pair_coeff = 13
@@ -109,7 +110,7 @@ if __name__ == "__main__":
             # gen_size = param
             algo_settings = [enc_mess, letter_freq, pair_freq, words,
                             replication_rate, cross_over_rate,
-                            mutation_rate, gen_size, executor,
+                            mutation_rate, mutation_number, gen_size, executor,
                             pickle_eval_word, word_coeff, 
                             letter_coeff, pair_coeff]
                 

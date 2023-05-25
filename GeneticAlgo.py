@@ -6,7 +6,7 @@ class GeneticAlgo:
     
     def __init__(self, enc_message, letter_freq, pair_freq,
                  word_set, replication_rate, cross_over_rate,
-                 mutation_rate, gen_size, executor, word_eval_func,
+                 mutation_rate, mutation_number, gen_size, executor, word_eval_func,
                  word_coeff, letter_coeff, pairs_coeff):
         """sets all parameters of the algorithm, generates any independent
         variables such as the rng object and solution representation.
@@ -37,6 +37,7 @@ class GeneticAlgo:
         self.replication_rate = replication_rate
         self.cross_over_rate = cross_over_rate
         self.mutation_rate = mutation_rate
+        self.mutation_number = mutation_number
         
         # make gen size even to make life easier
         self.gen_size = gen_size + (gen_size % 2)
@@ -255,14 +256,12 @@ class GeneticAlgo:
         Args:
             solution (np.array): an array of integers between 0 and 25 representing the alphabet
         """
-        for i in range(26):
+        for i in range(self.mutation_number):
             rand = self.rng.random(1)
             if rand <= self.mutation_rate:
-                swap = self.rng.integers(25)
-                
-                temp = solution[i].copy()
-                solution[i] = solution[swap]
-                solution[swap] = temp
+                swap1 = self.rng.integers(26)
+                swap2 = self.rng.integers(26)
+                solution[swap1], solution[swap2] = solution[swap2], solution[swap1]
 
             
     def get_founder_gen(self):
