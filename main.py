@@ -57,7 +57,8 @@ def graph_stats(stats):
     plt.plot(iterations, avg_score_data, color='g', label="average score")
     plt.plot(iterations, max_score_data, color='r', label="max score")
     plt.legend()
-    plt.show()
+    plt.savefig()
+    plt.clf()
 
 if __name__ == "__main__":
     
@@ -70,7 +71,6 @@ if __name__ == "__main__":
         enc_mess = encrypted_file.read()
 
     with open("dict.txt") as word_dict:
-        # words = set(word_dict.readlines())
         text = word_dict.read()
         words = set(text.split("\n"))
 
@@ -97,15 +97,15 @@ if __name__ == "__main__":
     pair_coeff = 13
     
     mp.set_start_method('spawn')
-    params = [[10, 7, 3],[10, 3, 7],
-             [10, 3, 1], [5, 3, 1],[5, 1, 0],[3, 1, 0],[1, 0, 0]]
+    # params = [[10, 7, 3],[10, 3, 7],
+    #          [10, 3, 1], [5, 3, 1],[5, 1, 0],[3, 1, 0],[1, 0, 0]]
     # params = [75, 100, 125, 150, 200, 250, 300]
     with open("param_results.csv", 'a') as res:
         res.write("word_coeff,letter_coeff,pair_coeff,fitness_count,score,cover:\n")
         
     with mp.Pool(60) as executor:
-        for param in params:
-            word_coeff, letter_coeff ,pair_coeff = param
+        # for param in params:
+        #     word_coeff, letter_coeff ,pair_coeff = param
             # gen_size = param
             algo_settings = [enc_mess, letter_freq, pair_freq, words,
                             replication_rate, cross_over_rate,
