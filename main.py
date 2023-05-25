@@ -13,14 +13,16 @@ def encode_message(message, alphabet):
     return new_message
 
 
-def graph_stats(stats):
+def graph_stats(stats, args):
     avg_score_data = stats['avg']
     max_score_data = stats['max']
     iterations = np.arange(stats.size)
     plt.plot(iterations, avg_score_data, color='g', label="average score")
     plt.plot(iterations, max_score_data, color='r', label="max score")
     plt.legend()
-    plt.show()
+    name_string = ",".join(str(args))
+    plt.savefig(f"{name_string}.png")
+    plt.clf()
 
 if __name__ == "__main__":
     
@@ -51,19 +53,17 @@ if __name__ == "__main__":
             freq, pair = line.split("\t")
             pair_freq[pair.lower()] = float(freq)
 
-    gen_size = 200
+    gen_size = 100
     replication_rate = 0.1
     cross_over_rate = 1-replication_rate
-    mutation_rate = 0.05
+    mutation_rate = 0.8
+    mutation_number = 3
     word_coeff = 1
     letter_coeff = 1
     pair_coeff = 1
 
     # enc_mess = encode_message(enc_mess, alphabet)
-
-    # params = [[20, 5, 13]]
-    # params = [[10, 7, 3],[10, 3, 7],
-    #          [10, 3, 1], [5, 3, 1],[5, 1, 0],[3, 1, 0],[1, 0, 0]]
+    # params = [[15, 3, 2], [5, 3, 1],[2, 1, 1],[2, 1, 1],[1, 1, 1],[1, 0, 0]]
     # params = [75, 100, 125, 150, 200, 250, 300]
 
     with open("param_results.csv", 'a') as res:
@@ -74,14 +74,19 @@ if __name__ == "__main__":
         # gen_size = param
         algo_settings = [enc_mess, letter_freq, pair_freq, words,
                         replication_rate, cross_over_rate,
-                        mutation_rate, gen_size, word_coeff, 
+                        mutation_rate, mutation_number, gen_size, word_coeff, 
                         letter_coeff, pair_coeff]
             
 
         genetic_algo = GeneticAlgo(*algo_settings)
-        
-        solution, fitness_count, stats = genetic_algo.run()
-        # graph_stats(stats)
+        solution, fitness_count, stats = genetic_algo.run(500)
+    
+        if stats.size == 500:
+            with open("param_results.csv", 'a') as res:
+                res.write(f"{word_coeff},{letter_coeff},{pair_coeff},over 500!\n")
+            # continue
+        graph_stats(stats, [word_coeff, letter_coeff ,pair_coeff])
+
         plain_text = genetic_algo.decode_message(enc_mess, solution)
         score = genetic_algo.eval_func(solution)
         cover = genetic_algo.coverage(solution)
@@ -94,6 +99,7 @@ if __name__ == "__main__":
         for i in range(len(solution)):
             letter = alphabet[solution[i]]
             gen_perm.write(f"{alphabet[i]} {letter}\n")
+
     with open("plain.txt", 'w+') as gen_sol:
         gen_sol.write(plain_text)
         

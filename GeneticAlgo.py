@@ -7,7 +7,7 @@ class GeneticAlgo:
     
     def __init__(self, enc_message, letter_freq, pair_freq,
                  word_set, replication_rate, cross_over_rate,
-                 mutation_rate, gen_size,
+                 mutation_rate, mutation_number, gen_size,
                  word_coeff, letter_coeff, pairs_coeff):
         """sets all parameters of the algorithm, generates any independent
         variables such as the rng object and solution representation.
@@ -36,11 +36,12 @@ class GeneticAlgo:
         self.replication_rate = replication_rate
         self.cross_over_rate = cross_over_rate
         self.mutation_rate = mutation_rate
+        self.mutation_number = mutation_number
         
         # make gen size even to make life easier
         self.gen_size = gen_size + (gen_size % 2)
         
-        self.rng = np.random.default_rng(7)
+        self.rng = np.random.default_rng()
 
         self.word_coeff = word_coeff
         self.letter_coeff = letter_coeff
@@ -54,6 +55,7 @@ class GeneticAlgo:
         # for evaluation, remove all non abc characters
         self.encoded_message = re.sub('[0-9\[\](){}<>;@&^%$!*?,.\n]', '', self.encoded_message)
         
+                
     def coverage(self, solution):
         """calculate the coverage of valid words out of the words in a solution
 
@@ -76,63 +78,6 @@ class GeneticAlgo:
                     count +=1
 
         return count/total
-
-
-    def run(self, iterations=None):
-        """starts running the algorithm, with the given number of iterations
-
-        Args:
-            iterations (int, optional): number of iterations to run
-
-        Returns:
-            list: a list of solutions, sorted in ascending order
-        """
-        solutions = self.get_founder_gen()
-        previous_best_count = 0
-        previous_best = solutions[0].copy()
-        i = 0
-        score_stats = np.array([(0,0)], dtype=[('max', float), ('avg', float)])
-
-        while previous_best_count < 10 and i != iterations:
-            solutions, avg_score, max_score = self.evolve_new_gen(solutions)
-            new_val = np.array([(max_score, avg_score)], dtype=[('max', float), ('avg', float)])
-            score_stats = np.append(score_stats, new_val)
-
-            if (previous_best == solutions[0]).all():
-                previous_best_count += 1
-            else:
-                previous_best = solutions[0].copy()
-                previous_best_count = 0
-
-            i += 1
-            if previous_best_count >= 10:
-                # nested if to prevent unnecessary coverage computation
-                if self.coverage(solutions[0]) < 0.6:
-                    # if the last 5 best solutions has not changed
-                    # and there are still many words that are not in the dictionary
-                    # it is a sign of early convergence, and the algorithm will 'reset'.
-                    solutions = self.get_founder_gen()
-                    previous_best_count = 0
-                    previous_best = solutions[0].copy()
-                elif self.coverage(solutions[0]) < 0.9:
-                    # if the best solution hasnt improved for the past 5
-                    # generations but there is only a small portion
-                    # of invalid words, increase mutation rate to overcome
-                    # local maxima near the global one, and give pair frequency
-                    # a higher weight.
-                    previous_best_count = 0
-                    self.mutation_rate += 0.03
-                    self.pairs_coeff = 10
-                    self.letter_coeff = 1
-
-                    # print(f"changed mode at iteration {i}")
-                    
-            if i%20 == 0:
-                print(f"iteration {i}, score {self.eval_func(solutions[0])}:")
-                print(self.decode_message(self.encoded_message, solutions[0])[:100])
-
-        print(f"best solution found at generation {i}, in {self.fitness_count} evaluations")        
-        return solutions[0], self.fitness_count, score_stats
             
     
     def validate_solution(self, solution):
@@ -153,6 +98,7 @@ class GeneticAlgo:
             if counter.count(i) == 0:
                 missing_letters.append(i)
 
+        self.rng.shuffle(missing_letters)     
 
         if len(double_letters) != len(missing_letters):
             print("error in validation")
@@ -162,10 +108,14 @@ class GeneticAlgo:
             return
         
         for i in double_letters:
+            is_first = bool(self.rng.integers(2))
             for j in range(26):
                 if i == solution[j]:
-                    solution[j] = missing_letters.pop()
-                    break
+                    if is_first:
+                        solution[j] = missing_letters.pop()
+                        break
+                    else:
+                        is_first = True
 
     
     def cross_over(self, sol1, sol2):
@@ -225,58 +175,11 @@ class GeneticAlgo:
         
         # create an empty dictionary to store the counts of each pair of letters.
         pairs_count = {}
-        new_string = string.replace(" ", "")
-        i = 0
         for char1 in self.alphabet:
             for char2 in self.alphabet:
-                pairs_count[char1 + char2] = new_string.count(char1 + char2)
-                i += new_string.count(char1 + char2)
+                pairs_count[char1 + char2] = string.count(char1 + char2)
 
         return pairs_count
-
-    
-    def eval_func(self, solution):
-        """evaluation function for solutions, calculating the number
-        of valid words in it, the letter frequencies and pairs of letters
-        frequencies.
-
-        Args:
-            solution (np.array): an array of integers between 0 and 25 representing the alphabet
-
-        Returns:
-            float: a score for the given solution
-        """
-        self.fitness_count += 1
-        decrypt_message = self.decode_message(self.encoded_message, solution)
-        spaces = decrypt_message.count(" ")
-        length = len(decrypt_message) - spaces
-        message_words = decrypt_message.split(" ")
-
-        # remove any empty words
-        while message_words.count("") != 0:
-            message_words.remove("")
-        
-        valid_words = 0
-
-        for word in message_words:
-            if word in self.word_set:
-                valid_words += 1
-
-        letter_count = Counter(decrypt_message)
-        pair_count = self.count_pairs(decrypt_message)
-        word_score = valid_words / len(message_words)
-        letter_score = 0
-        pair_score = 0
-
-        for char1 in self.alphabet:
-            letter_score += abs(letter_count[char1]/length - self.letter_freq[char1])/len(self.alphabet)
-            for char2 in self.alphabet:
-                pair_score += abs(pair_count[char1+char2]/(length-1) - self.pair_freq[char1+char2])/(len(self.alphabet))**2
-        score = (self.word_coeff*word_score -
-                self.letter_coeff*letter_score - self.pairs_coeff*pair_score)
-
-        return score
-    
     
     def mutate(self, solution):
         """for each letter in the solution, apply a random
@@ -285,15 +188,13 @@ class GeneticAlgo:
         Args:
             solution (np.array): an array of integers between 0 and 25 representing the alphabet
         """
-        for i in range(26):
+        for i in range(self.mutation_number):
             rand = self.rng.random(1)
             if rand <= self.mutation_rate:
-                swap = self.rng.integers(25)
-                
-                temp = solution[i].copy()
-                solution[i] = solution[swap]
-                solution[swap] = temp
-                
+                swap1 = self.rng.integers(26)
+                swap2 = self.rng.integers(26)
+                solution[swap1], solution[swap2] = solution[swap2], solution[swap1]
+
             
     def get_founder_gen(self):
         """generate random solutions by shuffling representation arrays
@@ -336,6 +237,107 @@ class GeneticAlgo:
         score_rank2 = np.searchsorted(score_index_arr['score'], rand2, side='right')
 
         return score_rank1, score_rank2
+
+    def run(self, iterations=None):
+        """starts running the algorithm, with the given number of iterations
+
+        Args:
+            iterations (int, optional): number of iterations to run
+
+        Returns:
+            list: a list of solutions, sorted in ascending order
+        """
+        solutions = self.get_founder_gen()
+        previous_best_count = 0
+        previous_best = solutions[0].copy()
+        i = 0
+        score_stats = np.array([(0,0)], dtype=[('max', float), ('avg', float)])
+
+        while previous_best_count < 15 and i != iterations:
+            solutions, avg_score, max_score = self.evolve_new_gen(solutions)
+            new_val = np.array([(max_score, avg_score)], dtype=[('max', float), ('avg', float)])
+            score_stats = np.append(score_stats, new_val)
+
+            if (previous_best == solutions[0]).all():
+                previous_best_count += 1
+            else:
+                previous_best = solutions[0].copy()
+                previous_best_count = 0
+
+            if previous_best_count >= 15:
+                # nested if to prevent unnecessary coverage computation
+                if self.coverage(solutions[0]) < 0.5:
+                    # if the last 5 best solutions has not changed
+                    # and there are still many words that are not in the dictionary
+                    # it is a sign of early convergence, and the algorithm will 'reset'.
+                    solutions = self.get_founder_gen()
+                    previous_best_count = 0
+                    previous_best = solutions[0].copy()
+                    print("reset")
+
+                elif self.coverage(solutions[0]) < 0.55:
+                    # if the best solution hasnt improved for the past 5
+                    # generations but there is only a small portion
+                    # of invalid words, increase mutation rate to overcome
+                    # local maxima near the global one, and give pair frequency
+                    # a higher weight.
+                    previous_best_count = 0
+                    self.mutation_number += 1
+                    print(f"changed mode at iteration {i}")
+
+
+                
+
+            if i%20 == 0:
+                print(f"iteration {i}, score {self.eval_func(solutions[0])}, coverage:{self.coverage(solutions[0])}:")
+                print(self.decode_message(self.encoded_message, solutions[0])[:100])
+            i += 1
+
+        print(f"best solution found at generation {i}, in {self.fitness_count} evaluations")        
+        return solutions[0], self.fitness_count, score_stats
+    
+    def eval_func(self, solution):
+        """evaluation function for solutions, calculating the number
+        of valid words in it, the letter frequencies and pairs of letters
+        frequencies.
+
+        Args:
+            solution (np.array): an array of integers between 0 and 25 representing the alphabet
+
+        Returns:
+            float: a score for the given solution
+        """
+        self.fitness_count += 1
+        decrypt_message = self.decode_message(self.encoded_message, solution)
+        spaces = decrypt_message.count(" ")
+        length = len(decrypt_message) - spaces
+        message_words = decrypt_message.split(" ")
+
+        # remove any empty words
+        while message_words.count("") != 0:
+            message_words.remove("")
+        
+        valid_words = 0
+
+        for word in message_words:
+            if word in self.word_set:
+                valid_words += 1
+
+        letter_count = Counter(decrypt_message)
+        pair_count = self.count_pairs(decrypt_message)
+        word_score = valid_words / len(message_words)
+        letter_score = 0
+        pair_score = 0
+
+        for char1 in self.alphabet:
+            letter_score += (letter_count[char1]/length - self.letter_freq[char1])**2/len(self.alphabet)
+            for char2 in self.alphabet:
+                pair_score += (pair_count[char1+char2]/(length-1) - self.pair_freq[char1+char2])**2/(len(self.alphabet))**2
+                
+        score = (self.word_coeff*word_score -
+                self.letter_coeff*letter_score - self.pairs_coeff*pair_score)
+
+        return score
     
     def evolve_new_gen(self, solutions):
         """_summary_
@@ -352,11 +354,12 @@ class GeneticAlgo:
             
         # sorts the solutions in ascending order
         score_index_arr.sort(order='score')
+        
 
         # make sure all values are positive
         if score_index_arr[0]['score'] < 0:
             score_index_arr['score'] -= score_index_arr[0]['score'] 
-            
+        
         # get statistics
         max_score = score_index_arr[-1]['score']
         avg_score = np.mean(score_index_arr['score'])
@@ -365,7 +368,7 @@ class GeneticAlgo:
         score_sum = np.sum(score_index_arr['score'])
         score_index_arr['score'] = score_index_arr['score'] / score_sum
         
-        # make score colmutive, so sampling can be done with a random number between 0 and 1
+        # make score cumulative, so sampling can be done with a random number between 0 and 1
         for i in range(1, self.gen_size):
             score_index_arr[i]['score'] = score_index_arr[i]['score'] + score_index_arr[i-1]['score']
 
@@ -373,8 +376,12 @@ class GeneticAlgo:
         score_index_arr[-1]['score'] = 1
 
         # replicate the best solutions
-        best_solutions_indices = [score_index_arr[-i]['index'] for i in range(1, self.replicated_portion+1)]
-        new_solutions = solutions[best_solutions_indices].copy()
+        sol = solutions[score_index_arr[-1]['index']].copy()
+        new_solutions = np.array([sol])
+        for i in range(1, self.replicated_portion):
+            sol = solutions[score_index_arr[-i]['index']].copy()
+            self.mutate(sol)
+            new_solutions = np.concatenate((new_solutions, [sol]), axis=0)
         
         random_portions = self.rng.random((self.crossed_over_portion,2))
         cross_over_pairs = [self.get_index(rands, score_index_arr) for rands in random_portions]
