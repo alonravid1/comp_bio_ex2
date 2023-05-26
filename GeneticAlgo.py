@@ -327,9 +327,9 @@ class GeneticAlgo:
         pair_score = 0
 
         for char1 in self.alphabet:
-            letter_score += (letter_count[char1]/length - self.letter_freq[char1])**2/len(self.alphabet)
+            letter_score += abs(letter_count[char1]/length - self.letter_freq[char1])/len(self.alphabet)
             for char2 in self.alphabet:
-                pair_score += (pair_count[char1+char2]/(length-1) - self.pair_freq[char1+char2])**2/(len(self.alphabet))**2
+                pair_score += abs(pair_count[char1+char2]/(length-1) - self.pair_freq[char1+char2])/(len(self.alphabet))**2
                 
         score = (self.word_coeff*word_score +
                 self.letter_coeff*(1 - letter_score) + self.pairs_coeff*(1 - pair_score))

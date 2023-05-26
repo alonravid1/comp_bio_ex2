@@ -53,13 +53,13 @@ if __name__ == "__main__":
             freq, pair = line.split("\t")
             pair_freq[pair.lower()] = float(freq)
 
-    gen_size = 250
+    gen_size = 100
     replication_rate = 0.1
     cross_over_rate = 1-replication_rate
     mutation_rate = 0.8
     mutation_number = 3
-    word_coeff = 5
-    letter_coeff = 3
+    word_coeff = 6
+    letter_coeff = 2
     pair_coeff = 1
 
     # enc_mess = encode_message(enc_mess, alphabet)
