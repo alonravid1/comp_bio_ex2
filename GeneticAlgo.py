@@ -37,12 +37,12 @@ class GeneticAlgo:
         self.replication_rate = replication_rate
         self.cross_over_rate = cross_over_rate
         self.mutation_rate = mutation_rate
-        self.mutation_number = mutation_number
+        # self.mutation_number = mutation_number
         
         # make gen size even to make life easier
         self.gen_size = gen_size + (gen_size % 2)
         
-        self.rng = np.random.default_rng(7)
+        self.rng = np.random.default_rng()
         self.executor = executor
         self.word_eval_func = word_eval_func
         
@@ -96,7 +96,7 @@ class GeneticAlgo:
         previous_best = solutions[0].copy()
         i = 0
         score_stats = np.array([(0,0)], dtype=[('max', float), ('avg', float)])
-        while previous_best_count < 10 and i != iterations:
+        while previous_best_count < 8 and i != iterations:
             solutions, avg_score, max_score = self.evolve_new_gen(solutions)
             new_val = np.array([(max_score, avg_score)], dtype=[('max', float), ('avg', float)])
             score_stats = np.append(score_stats, new_val)
@@ -106,7 +106,8 @@ class GeneticAlgo:
                 previous_best = solutions[0].copy()
                 previous_best_count = 0
             i += 1
-            if previous_best_count >= 5:
+
+            if previous_best_count >= 3:
                 # nested if to prevent unnecessary coverage computation
                 if self.coverage(solutions[0]) < 0.6:
                     # if the last 5 best solutions has not changed
@@ -115,21 +116,19 @@ class GeneticAlgo:
                     solutions = self.get_founder_gen()
                     previous_best_count = 0
                     previous_best = solutions[0].copy()
-                elif self.coverage(solutions[0]) < 0.9:
+                    
+                elif self.coverage(solutions[0]) < 0.8:
                     # if the best solution hasnt improved for the past 5
                     # generations but there is only a small portion
                     # of invalid words, increase mutation rate to overcome
                     # local maxima near the global one, and give pair frequency
                     # a higher weight.
-                    previous_best_count = 0
-                    self.mutation_rate += 0.03
-                    self.pairs_coeff = 15
-                    self.letter_coeff = 1
-
-                    # print(f"changed mode at iteration {i}")
+                    if self.mutation_rate < 0.9:
+                        self.mutation_rate += 0.1
+                    print(f"changed mode at iteration {i}")
                     
             if i%20 == 0:
-                print(f"iteration {i}, score {self.eval_func(solutions[0])}:")
+                print(f"iteration {i}:")
                 print(self.decode_message(self.encoded_message, solutions[0])[:100])
 
         print(f"best solution found at generation {i}, in {self.fitness_count} evaluations")        
@@ -154,6 +153,7 @@ class GeneticAlgo:
             if counter.count(i) == 0:
                 missing_letters.append(i)
 
+        self.rng.shuffle(missing_letters)     
 
         if len(double_letters) != len(missing_letters):
             print("error in validation")
@@ -163,10 +163,14 @@ class GeneticAlgo:
             return
         
         for i in double_letters:
+            is_first = bool(self.rng.integers(2))
             for j in range(26):
                 if i == solution[j]:
-                    solution[j] = missing_letters.pop()
-                    break
+                    if is_first:
+                        solution[j] = missing_letters.pop()
+                        break
+                    else:
+                        is_first = True
 
     
     def cross_over(self, sol1, sol2):
@@ -256,7 +260,7 @@ class GeneticAlgo:
         Args:
             solution (np.array): an array of integers between 0 and 25 representing the alphabet
         """
-        for i in range(self.mutation_number):
+        for i in range(26):
             rand = self.rng.random(1)
             if rand <= self.mutation_rate:
                 swap1 = self.rng.integers(26)

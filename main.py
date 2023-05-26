@@ -50,14 +50,14 @@ def pickle_eval_word(args):
             letter_coeff*letter_score + pairs_coeff*pair_score)
     return score
     
-def graph_stats(stats):
+def graph_stats(stats, param):
     avg_score_data = stats['avg']
     max_score_data = stats['max']
     iterations = np.arange(stats.size)
     plt.plot(iterations, avg_score_data, color='g', label="average score")
     plt.plot(iterations, max_score_data, color='r', label="max score")
     plt.legend()
-    plt.savefig()
+    plt.savefig(f"{param[0]}, {param[1]}, {param[2]}.png")
     plt.clf()
 
 if __name__ == "__main__":
@@ -91,39 +91,50 @@ if __name__ == "__main__":
     gen_size = 150
     replication_rate = 0.1
     cross_over_rate = 1-replication_rate
-    mutation_rate = 0.04
-    mutation_number = 3
+    mutation_rate = 0.05
+    mutation_number = 4
     word_coeff = 20
     letter_coeff = 5
     pair_coeff = 13
     
+    repeats = 5
     mp.set_start_method('spawn')
-    # params = [[10, 7, 3],[10, 3, 7],
-    #          [10, 3, 1], [5, 3, 1],[5, 1, 0],[3, 1, 0],[1, 0, 0]]
+    params = [[10,7,3],[5,1,0],[3,1,0],[5,3,1],[1,1,1]]
     # params = [75, 100, 125, 150, 200, 250, 300]
     with open("param_results.csv", 'a') as res:
         res.write("word_coeff,letter_coeff,pair_coeff,fitness_count,score,cover:\n")
         
     with mp.Pool(60) as executor:
-        # for param in params:
-        #     word_coeff, letter_coeff ,pair_coeff = param
+        for param in params:
+            avg_score = 0
+            avg_fitness = 0
+            avg_cover = 0
+            word_coeff, letter_coeff ,pair_coeff = param
             # gen_size = param
-            algo_settings = [enc_mess, letter_freq, pair_freq, words,
-                            replication_rate, cross_over_rate,
-                            mutation_rate, mutation_number, gen_size, executor,
-                            pickle_eval_word, word_coeff, 
-                            letter_coeff, pair_coeff]
-                
 
-            genetic_algo = GeneticAlgo(*algo_settings)
+            algo_settings = [enc_mess, letter_freq, pair_freq, words,
+                                replication_rate, cross_over_rate,
+                                mutation_rate, mutation_number, gen_size, executor,
+                                pickle_eval_word, word_coeff, 
+                                letter_coeff, pair_coeff]
             
-            solution, fitness_count, stats = genetic_algo.run()
-            # graph_stats(stats)
-            plain_text = genetic_algo.decode_message(enc_mess, solution)
-            score = genetic_algo.eval_func(solution)
-            cover = genetic_algo.coverage(solution)
+            for i in range(repeats):
+                genetic_algo = GeneticAlgo(*algo_settings)
+                
+                solution, fitness_count, stats = genetic_algo.run(360)
+                if i == 4:
+                    graph_stats(stats, param)
+                    plain_text = genetic_algo.decode_message(enc_mess, solution)
+                
+                avg_score += genetic_algo.eval_func(solution)
+                avg_cover += genetic_algo.coverage(solution)
+                avg_fitness += fitness_count
+
+            avg_score = round(avg_score / repeats, 2)
+            avg_cover = round(avg_cover / repeats, 2)*100
+            avg_fitness = avg_fitness // repeats
             with open("param_results.csv", 'a') as res:
-                res.write(f"{word_coeff},{letter_coeff},{pair_coeff},{fitness_count},{score},{cover}\n")
+                res.write(f"{word_coeff},{letter_coeff},{pair_coeff},{avg_fitness},{avg_score},{avg_cover}%\n")
                 # res.write(f"{gen_size},{fitness_count},{score},{cover}\n")
         
     with open("perm.txt", 'w+') as gen_perm:
