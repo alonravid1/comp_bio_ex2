@@ -248,48 +248,45 @@ class GeneticAlgo:
             list: a list of solutions, sorted in ascending order
         """
         solutions = self.get_founder_gen()
-        previous_best_count = 0
-        previous_best = solutions[0].copy()
+        previous_avg_count = 0
+        previous_avg = 0
         i = 0
         score_stats = np.array([(0,0)], dtype=[('max', float), ('avg', float)])
 
-        while previous_best_count < 15 and i != iterations:
+        while previous_avg_count < 10 and i != iterations:
             solutions, avg_score, max_score = self.evolve_new_gen(solutions)
             new_val = np.array([(max_score, avg_score)], dtype=[('max', float), ('avg', float)])
             score_stats = np.append(score_stats, new_val)
 
-            if (previous_best == solutions[0]).all():
-                previous_best_count += 1
+            if previous_avg == avg_score:
+                previous_avg_count += 1
             else:
-                previous_best = solutions[0].copy()
-                previous_best_count = 0
+                previous_avg = avg_score
+                previous_avg_count = 0
 
-            if previous_best_count >= 15:
+            if previous_avg_count >= 10:
                 # nested if to prevent unnecessary coverage computation
                 if self.coverage(solutions[0]) < 0.5:
                     # if the last 5 best solutions has not changed
                     # and there are still many words that are not in the dictionary
                     # it is a sign of early convergence, and the algorithm will 'reset'.
                     solutions = self.get_founder_gen()
-                    previous_best_count = 0
-                    previous_best = solutions[0].copy()
+                    previous_avg_count = 0
+                    previous_avg = 0
                     print("reset")
 
-                elif self.coverage(solutions[0]) < 0.55:
+                elif self.coverage(solutions[0]) < 0.8:
                     # if the best solution hasnt improved for the past 5
                     # generations but there is only a small portion
                     # of invalid words, increase mutation rate to overcome
                     # local maxima near the global one, and give pair frequency
                     # a higher weight.
-                    previous_best_count = 0
+                    previous_avg_count = 0
                     self.mutation_number += 1
                     print(f"changed mode at iteration {i}")
 
-
-                
-
             if i%20 == 0:
-                print(f"iteration {i}, score {self.eval_func(solutions[0])}, coverage:{self.coverage(solutions[0])}:")
+                print(f"iteration {i}, best score {max_score}, avg score {avg_score}, coverage:{self.coverage(solutions[0])}:")
                 print(self.decode_message(self.encoded_message, solutions[0])[:100])
             i += 1
 
@@ -334,8 +331,8 @@ class GeneticAlgo:
             for char2 in self.alphabet:
                 pair_score += (pair_count[char1+char2]/(length-1) - self.pair_freq[char1+char2])**2/(len(self.alphabet))**2
                 
-        score = (self.word_coeff*word_score -
-                self.letter_coeff*letter_score - self.pairs_coeff*pair_score)
+        score = (self.word_coeff*word_score +
+                self.letter_coeff*(1 - letter_score) + self.pairs_coeff*(1 - pair_score))
 
         return score
     
@@ -355,10 +352,6 @@ class GeneticAlgo:
         # sorts the solutions in ascending order
         score_index_arr.sort(order='score')
         
-
-        # make sure all values are positive
-        if score_index_arr[0]['score'] < 0:
-            score_index_arr['score'] -= score_index_arr[0]['score'] 
         
         # get statistics
         max_score = score_index_arr[-1]['score']
