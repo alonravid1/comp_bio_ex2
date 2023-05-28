@@ -1,11 +1,12 @@
 import numpy as np
 import re
+from collections import Counter
 
     
 class GeneticAlgo:
     
     def __init__(self, enc_message, letter_freq, pair_freq,
-                 word_set, replication_rate, cross_over_rate,
+                 word_dict, replication_rate, cross_over_rate,
                  mutation_rate, mutation_number, gen_size, executor, word_eval_func,
                  word_coeff, letter_coeff, pairs_coeff):
         """sets all parameters of the algorithm, generates any independent
@@ -15,7 +16,7 @@ class GeneticAlgo:
             enc_message (string): an encoded message
             letter_freq (dict): a dictionary of characters and their frequency
             pair_freq (dict): a dictionary of pairs of characters and their frequency
-            word_set (set): a set of valid words
+            word_dict (set): a set of valid words
             replication_rate (float): portion of generation which is replicated as is to the next
             cross_over_rate (float): portion of generation which is crossed over
             mutation_rate (float): chance for a single letter in a solution to be mutated
@@ -33,11 +34,11 @@ class GeneticAlgo:
         self.encoded_message = enc_message
         self.letter_freq = letter_freq
         self.pair_freq = pair_freq
-        self.word_set = word_set
+        self.word_dict = word_dict
         self.replication_rate = replication_rate
         self.cross_over_rate = cross_over_rate
         self.mutation_rate = mutation_rate
-        # self.mutation_number = mutation_number
+        self.mutation_number = mutation_number
         
         # make gen size even to make life easier
         self.gen_size = gen_size + (gen_size % 2)
@@ -53,7 +54,7 @@ class GeneticAlgo:
 
         self.replicated_portion = int(self.gen_size*self.replication_rate)
         self.replicated_portion += self.replicated_portion % 2
-        self.crossed_over_portion = (self.gen_size - self.replicated_portion)//2
+        self.crossed_over_portion = (self.gen_size - self.replicated_portion)
 
         # for evaluation, remove all non abc characters
         self.encoded_message = re.sub('[0-9\[\](){}<>;@&^%$!*?,.\n]', '', self.encoded_message)
@@ -74,9 +75,9 @@ class GeneticAlgo:
 
         # remove any empty words
         for word in message_words:
-            if word != " ":
+            if word != " " and word != "":
                 total +=1
-                if word in self.word_set:
+                if word in self.word_dict[len(word)]:
                     count +=1
 
         return count/total
@@ -96,7 +97,8 @@ class GeneticAlgo:
         previous_best = solutions[0].copy()
         i = 0
         score_stats = np.array([(0,0)], dtype=[('max', float), ('avg', float)])
-        while previous_best_count < 8 and i != iterations:
+
+        while previous_best_count < 10 and i != iterations:
             solutions, avg_score, max_score = self.evolve_new_gen(solutions)
             new_val = np.array([(max_score, avg_score)], dtype=[('max', float), ('avg', float)])
             score_stats = np.append(score_stats, new_val)
@@ -105,31 +107,24 @@ class GeneticAlgo:
             else:
                 previous_best = solutions[0].copy()
                 previous_best_count = 0
-            i += 1
+            
 
-            if previous_best_count >= 3:
-                # nested if to prevent unnecessary coverage computation
-                if self.coverage(solutions[0]) < 0.6:
-                    # if the last 5 best solutions has not changed
-                    # and there are still many words that are not in the dictionary
+            print(f"iteration {i}, best score:{max_score}")
+            print(self.decode_message(self.encoded_message, solutions[0])[:100])
+            
+            # nested if to prevent unnecessary coverage computation                    
+            if previous_best_count == 10:
+                if self.coverage(solutions[0]) < 0.9:
+                    # if the last 10 best solutions has not changed
                     # it is a sign of early convergence, and the algorithm will 'reset'.
                     solutions = self.get_founder_gen()
                     previous_best_count = 0
                     previous_best = solutions[0].copy()
-                    
-                elif self.coverage(solutions[0]) < 0.8:
-                    # if the best solution hasnt improved for the past 5
-                    # generations but there is only a small portion
-                    # of invalid words, increase mutation rate to overcome
-                    # local maxima near the global one, and give pair frequency
-                    # a higher weight.
-                    if self.mutation_rate < 0.9:
-                        self.mutation_rate += 0.1
-                    print(f"changed mode at iteration {i}")
-                    
-            if i%20 == 0:
-                print(f"iteration {i}:")
-                print(self.decode_message(self.encoded_message, solutions[0])[:100])
+                    print("reset")
+                # else coverage is higher than 0.9, which indicates a good
+                # solution is found, and the while loop will exit naturally
+
+            i += 1
 
         print(f"best solution found at generation {i}, in {self.fitness_count} evaluations")        
         return solutions[0], self.fitness_count, score_stats
@@ -142,7 +137,6 @@ class GeneticAlgo:
         Args:
             solution (np.array): an array of numbers representing a character in the alphabet
         """
-
         double_letters = []
         missing_letters = []
         counter = list(solution)
@@ -188,18 +182,23 @@ class GeneticAlgo:
         """
         # choose random point in the dict
         # to swap the dictionaries, with at least 1 swap
-        crossing_point = self.rng.integers(1,25)
+        # crossing_point = self.rng.integers(1,25)
 
-        temp = sol1[:crossing_point].copy()
-        sol1[:crossing_point], sol2[:crossing_point] = sol2[:crossing_point], temp
+        # temp = sol1[:crossing_point].copy()
+        # sol1[:crossing_point], sol2[:crossing_point] = sol2[:crossing_point], temp
 
-        sol1 = sol1.flatten()
-        sol2 = sol2.flatten()
+        # sol1 = sol1.flatten()
+        # sol2 = sol2.flatten()
 
-        self.validate_solution(sol1)
-        self.validate_solution(sol2)
 
-        return sol1, sol2
+        prob_matrix = self.rng.integers(0, 2, size=26)
+        offspring1 = np.where(prob_matrix == 0, sol1, sol2)
+        offspring2 = np.where(prob_matrix == 1, sol1, sol2)
+        
+        self.validate_solution(offspring1)
+        self.validate_solution(offspring2)
+
+        return offspring1, offspring2
 
     
     def decode_message(self, message, solution):
@@ -218,7 +217,24 @@ class GeneticAlgo:
         
         return new_message
 
-    
+    def count_pairs(self, string):
+        """Counts the number of pairs of letters in a string and outputs them as a dictionary.
+
+        Args:
+            string: The string to count pairs of letters in.
+
+        Returns:
+            A dictionary that maps each pair of letters to its count.
+        """
+        
+        # create an empty dictionary to store the counts of each pair of letters.
+        pairs_count = {}
+        for char1 in self.alphabet:
+            for char2 in self.alphabet:
+                pairs_count[char1 + char2] = string.count(char1 + char2)
+
+        return pairs_count
+        
     def eval_func(self, solution):
         """evaluation function for solutions, calculating the number
         of valid words in it, the letter frequencies and pairs of letters
@@ -233,22 +249,36 @@ class GeneticAlgo:
         self.fitness_count += 1
         decrypt_message = self.decode_message(self.encoded_message, solution)
 
+        spaces = decrypt_message.count(" ")
+        length = len(decrypt_message) - spaces
         message_words = decrypt_message.split(" ")
 
         # remove any empty words
         while message_words.count("") != 0:
             message_words.remove("")
 
-        iterable_args = [[word, self.word_set, self.letter_freq, self.pair_freq,
-                          self.word_coeff, self.letter_coeff, self.pairs_coeff]
-                                                    for word in message_words]
+        iterable_args = [[word, self.word_dict] for word in message_words]
 
-        ## used eval word to multithread this part
+        # used eval word to multithread this part
         score_futures = self.executor.map_async(self.word_eval_func,
-                                                iterable_args, chunksize=500)
+                                                iterable_args, chunksize=300)
 
         word_scores = np.array(score_futures.get())
-        score = np.sum(word_scores)
+        word_score = np.sum(word_scores)
+
+        letter_count = Counter(decrypt_message)
+        pair_count = self.count_pairs(decrypt_message)
+        word_score = word_score / len(message_words)
+        letter_score = 0
+        pair_score = 0
+
+        for char1 in self.alphabet:
+            letter_score += abs(letter_count[char1]/length - self.letter_freq[char1])/len(self.alphabet)
+            for char2 in self.alphabet:
+                pair_score += abs(pair_count[char1+char2]/(length-1) - self.pair_freq[char1+char2])/(len(self.alphabet))**2
+               
+        score = (self.word_coeff*word_score +
+                self.letter_coeff*(1 - letter_score) + self.pairs_coeff*(1 - pair_score))
 
         return score
     
@@ -260,6 +290,7 @@ class GeneticAlgo:
         Args:
             solution (np.array): an array of integers between 0 and 25 representing the alphabet
         """
+
         for i in range(self.mutation_number):
             rand = self.rng.random(1)
             if rand <= self.mutation_rate:
@@ -267,9 +298,7 @@ class GeneticAlgo:
                 swap2 = self.rng.integers(26)
                 solution[swap1], solution[swap2] = solution[swap2], solution[swap1]
 
-                swap1 = self.rng.integers(26)
-                swap2 = self.rng.integers(26)
-                solution[swap1], solution[swap2] = solution[swap2], solution[swap1]
+        return solution
 
             
     def get_founder_gen(self):
@@ -278,41 +307,14 @@ class GeneticAlgo:
         Returns:
             np.array: array of arrays representing the alphabet
         """
-        solutions = np.tile(self.sol_rep, (self.gen_size, 1))
-        for i in solutions:
-            # this is done in a for loop because shuffling all
-            # at once shuffles them the same way
-            self.rng.shuffle(i)
+        # solutions = np(self.sol_rep, (self.gen_size, 1))
+        # for i in solutions:
+        #     # this is done in a for loop because shuffling all
+        #     # at once shuffles them the same way
+        #     self.rng.shuffle(i)
+
+        solutions = np.array([self.rng.permutation(26) for i in range(self.gen_size)])
         return solutions
-    
-    
-    def get_index(self, rands, score_index_arr):
-        """the function recieves two random numbers between 0 and 1, and an array
-        which holds the solutions's scores after they have been scaled proportionally
-        between 0 and 1, and to summing up to 1, then the array was sorted and each
-        score's value was calculated as a cumultation of the previous scores.
-        
-        this means that each between any two solutions was a section
-        between 0 to 1 proportional to the second's proportional score,
-        which is also the chance for a random number to be between the two numbers.
-        
-        this results in the chance for picking an indice using the random numbers being
-        equal to the solution's score proportion.
-
-        Args:
-            rands (float, float): two random numbers between 0 and 1
-            score_index_arr (np.array):  array sorted by each solution's proportional
-            score and holds its score and index in the original solutions array.
-
-        Returns:
-            int, int: a pair indicies of solutions where the the random numbers
-            would be placed in the columative scores array. 
-        """
-        rand1, rand2 = rands[0], rands[1]
-        score_rank1 = np.searchsorted(score_index_arr['score'], rand1, side='right')
-        score_rank2 = np.searchsorted(score_index_arr['score'], rand2, side='right')
-
-        return score_rank1, score_rank2
     
     def evolve_new_gen(self, solutions):
         """_summary_
@@ -345,26 +347,29 @@ class GeneticAlgo:
         score_index_arr[-1]['score'] = 1
 
         # replicate the best solutions
-        best_solutions_indices = [score_index_arr[-1]['index'] for i in range(1, self.replicated_portion+1)]
-        new_solutions = solutions[best_solutions_indices].copy()
-        
-        random_portions = self.rng.random((self.crossed_over_portion,2))
-        cross_over_pairs = [self.get_index(rands, score_index_arr) for rands in random_portions]
-        
-        for pair in cross_over_pairs:
-            score_rank1, score_rank2 = pair
+        new_solutions = np.zeros((self.gen_size, 26), dtype=int)
+        new_solutions[0] = solutions[score_index_arr[-1]['index']].copy()
 
-            # for all other solutions, pick two at a time to
-            # crossover and add to the new generation, biased
-            # such that higher scoring solutions have a higher
-            # of being picked
+        for i in range(1, self.replicated_portion):
+            new_solutions[i] = solutions[score_index_arr[-1]['index']].copy()
+            new_solutions[i] = self.mutate(new_solutions[i])
+        
+        random_portions = self.rng.random(self.crossed_over_portion)
+                
+        for i in range(0, self.crossed_over_portion, 2):
+            score_rank1 = np.searchsorted(score_index_arr['score'], random_portions[i], side='right')
+            score_rank2 = np.searchsorted(score_index_arr['score'], random_portions[i+1], side='right')
             index1 = score_index_arr[score_rank1]['index']
             index2 = score_index_arr[score_rank2]['index']
 
             sol1, sol2 = self.cross_over(solutions[index1].copy(), solutions[index2].copy())
-            self.mutate(sol1)
-            self.mutate(sol2)
-            new_solutions = np.concatenate((new_solutions, [sol1]), axis=0)
-            new_solutions = np.concatenate((new_solutions, [sol2]), axis=0)
 
+            sol1 = self.mutate(sol1)
+            sol2 = self.mutate(sol2)
+
+            new_sol_index = self.replicated_portion + i
+            new_solutions[new_sol_index] = sol1.copy()
+            new_solutions[new_sol_index + 1] = sol2.copy()
+
+        print(new_solutions)
         return new_solutions, avg_score, max_score

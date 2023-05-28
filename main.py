@@ -18,37 +18,26 @@ def pickle_eval_word(args):
 
     Args:
         word (string): a word to be evaluated
-        word_set (set): a set of valid words
-        letter_freq (dict): a dictionary of characters and their frequency
-        pair_freq (dict): a dictionary of pairs of characters and their frequency
-        word_coeff (float): coefficient of word score
-        letter_coeff (float): coefficient of letter frequency score
-        pairs_coeff (float): coefficient of letter pairs frequency score
+        word_dict (set): a dictionary of valid words indexed by lengths
 
     Returns:
         score: a number representing a word's score
     """
-    word, word_set, letter_freq, pair_freq = args[:4]
-    word_coeff, letter_coeff, pairs_coeff = args[4:]
-    valid_word = 0
-    letter_score = 0
-    pair_score = 0
+
+
+    word, word_dict = args[:2]
+    min_hamming_distance = 1
+
     length = len(word)
-    if word in word_set:
-            # criteriea 1: words in dict/words in message
-            valid_word = length
-    for i in range(len(word)):
-        # criteriea 2: sum of frequencies of single letters
-        letter_score += letter_freq[word[i]]
-        if i+1 < len(word):
-            # criteriea 3: sum of frequencies of pairs of letters
-            pair_score += pair_freq[word[i:i+2]]
+    if word in word_dict[length]:
+            return 1
+
+    for dict_word in word_dict[length]:
+        hamming_distance = sum(char1 != char2 for char1, char2 in zip(word, dict_word)) / length
+        min_hamming_distance = min(min_hamming_distance, hamming_distance)
+
+    return (1 - min_hamming_distance)
     
-    letter_score = letter_score / length
-    pair_score = pair_score / length
-    score = (word_coeff*valid_word +
-            letter_coeff*letter_score + pairs_coeff*pair_score)
-    return score
     
 def graph_stats(stats, param):
     avg_score_data = stats['avg']
@@ -72,7 +61,14 @@ if __name__ == "__main__":
 
     with open("dict.txt") as word_dict:
         text = word_dict.read()
-        words = set(text.split("\n"))
+        words = text.split("\n")
+        word_dict = dict({i:[] for i in range(1,45)})
+        for word in words:
+            word_dict[len(word)].append(word)
+        for key in word_dict.keys():
+            word_dict[key] = set(word_dict[key])
+            
+            
 
     with open("Letter_Freq.txt") as letter_freq_file:
         for line in letter_freq_file.readlines():
@@ -89,17 +85,18 @@ if __name__ == "__main__":
             pair_freq[pair.lower()] = float(freq)
 
     gen_size = 150
-    replication_rate = 0.1
+    replication_rate = 0.25
     cross_over_rate = 1-replication_rate
-    mutation_rate = 0.05
-    mutation_number = 4
+    mutation_rate = 0.8
+    mutation_number = 3
     word_coeff = 20
     letter_coeff = 5
     pair_coeff = 13
     
-    repeats = 5
+    repeats = 1
     mp.set_start_method('spawn')
-    params = [[10,7,3],[5,1,0],[3,1,0],[5,3,1],[1,1,1]]
+    params = [[30,1,1]]
+    # params = [[10,7,3],[5,1,0],[3,1,0],[5,3,1],[1,1,1]]
     # params = [75, 100, 125, 150, 200, 250, 300]
     with open("param_results.csv", 'a') as res:
         res.write("word_coeff,letter_coeff,pair_coeff,fitness_count,score,cover:\n")
@@ -112,7 +109,7 @@ if __name__ == "__main__":
             word_coeff, letter_coeff ,pair_coeff = param
             # gen_size = param
 
-            algo_settings = [enc_mess, letter_freq, pair_freq, words,
+            algo_settings = [enc_mess, letter_freq, pair_freq, word_dict,
                                 replication_rate, cross_over_rate,
                                 mutation_rate, mutation_number, gen_size, executor,
                                 pickle_eval_word, word_coeff, 
@@ -120,9 +117,11 @@ if __name__ == "__main__":
             
             for i in range(repeats):
                 genetic_algo = GeneticAlgo(*algo_settings)
-                
+                # sol1 = np.random.permutation(26)
+                # sol2 = np.random.permutation(26)
+                # genetic_algo.cross_over(sol1, sol2)
                 solution, fitness_count, stats = genetic_algo.run(360)
-                if i == 4:
+                if i == 0:
                     graph_stats(stats, param)
                     plain_text = genetic_algo.decode_message(enc_mess, solution)
                 
