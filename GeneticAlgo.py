@@ -50,6 +50,7 @@ class GeneticAlgo:
         self.word_coeff = word_coeff
         self.letter_coeff = letter_coeff
         self.pairs_coeff = pairs_coeff
+        self.temp_coeff = 0
         self.fitness_count = 0
 
         self.replicated_portion = int(self.gen_size*self.replication_rate)
@@ -68,8 +69,8 @@ class GeneticAlgo:
         Returns:
             float: portion coverage
         """
-        decrypt_message = self.decode_message(self.encoded_message, solution)
-        message_words = decrypt_message.split(" ")
+        cut_message = self.decode_message(solution)
+        message_words = cut_message.split(" ")
         count = 0
         total = 0
 
@@ -82,6 +83,63 @@ class GeneticAlgo:
 
         return count/total
 
+        
+    # def perturb(self, solution):
+    #     """perturbate the solution in order to help it escape a local minima,
+    #     by forcing the permutation to switch a current valid short word with
+    #     with another
+
+    #     Args:
+    #         solution (np.array): a solution
+
+    #     Returns:
+    #         np.array: a modified solution
+    #     """
+    #     cut_message = self.decode_message(solution)
+    #     message_words = cut_message.split(" ")
+    #     short_valid_words = []
+
+    #     for word in message_words:
+    #         if word != "" and word != " " and len(word) <= 4:
+    #             if word in self.word_dict[len(word)]:
+    #                 short_valid_words.append(word)
+        
+    #     word = self.rng.choice(short_valid_words)
+    #     dict_words = list(self.word_dict[len(word)])
+    #     new_word = self.rng.choice(dict_words)
+    #     new_word = np.char.lower(new_word)
+    #     old_letters, old_index = np.unique(list(word), return_index=True)
+    #     new_letters, new_index = np.unique(list(new_word), return_index=True)
+
+        
+    #     while len(old_letters) != len(new_letters) or not np.char.isalpha(new_word):
+    #         word = np.choice(short_valid_words)
+    #         dict_words = list(self.word_dict[len(word)].values())
+    #         new_word = self.rng.choice(dict_words)
+    #         new_word = np.char.lower(new_word)
+    #         old_letters, old_index = np.unique(list(word), return_index=True)
+    #         new_letters, new_index = np.unique(list(new_word), return_index=True)
+
+    #     old_letters[np.argsort(old_index)]
+    #     new_letters[np.argsort(new_index)]
+    #     new_solution = solution.copy()
+        
+    #     letter_count = len(new_letters)
+    #     for j in range(letter_count):
+    #         for i in range(26):
+    #             if self.alphabet[solution[i]] == old_letters[j]:
+    #                 swap1 = i
+    #             if self.alphabet[solution[i]] == new_letters[j]:
+    #                 swap2 = i
+    #         print(word)
+    #         print(new_word)
+           
+    #         new_solution[swap1], new_solution[swap2] = solution[swap2], solution[swap1]
+
+    #     return np.array(new_solution)
+                        
+        
+        
 
     def run(self, iterations=None):
         """starts running the algorithm, with the given number of iterations
@@ -98,31 +156,40 @@ class GeneticAlgo:
         i = 0
         score_stats = np.array([(0,0)], dtype=[('max', float), ('avg', float)])
 
-        while previous_best_count < 10 and i != iterations:
+        while previous_best_count < 5 and i != iterations:
             solutions, avg_score, max_score = self.evolve_new_gen(solutions)
+            coverage = self.coverage(solutions[0])
             new_val = np.array([(max_score, avg_score)], dtype=[('max', float), ('avg', float)])
             score_stats = np.append(score_stats, new_val)
+
             if (previous_best == solutions[0]).all():
                 previous_best_count += 1
             else:
                 previous_best = solutions[0].copy()
                 previous_best_count = 0
-            
 
-            print(f"iteration {i}, best score:{max_score}")
-            print(self.decode_message(self.encoded_message, solutions[0])[:100])
             
+            print(f"iteration {i}, best score:{max_score}, coverage {coverage}:")
+            print(self.decode_message(solutions[0])[:100])
+            
+            if previous_best_count >= 3:
+                self.mutation_number = 1
+                self.replication_rate = 0.5
+                self.replicated_portion = int(self.gen_size*self.replication_rate)
+                self.replicated_portion += self.replicated_portion % 2
+                self.crossed_over_portion = (self.gen_size - self.replicated_portion)
+
+
             # nested if to prevent unnecessary coverage computation                    
-            if previous_best_count == 10:
-                if self.coverage(solutions[0]) < 0.9:
+            if previous_best_count >= 5:
+                if coverage < 0.5:
                     # if the last 10 best solutions has not changed
                     # it is a sign of early convergence, and the algorithm will 'reset'.
                     solutions = self.get_founder_gen()
                     previous_best_count = 0
                     previous_best = solutions[0].copy()
                     print("reset")
-                # else coverage is higher than 0.9, which indicates a good
-                # solution is found, and the while loop will exit naturally
+
 
             i += 1
 
@@ -182,26 +249,26 @@ class GeneticAlgo:
         """
         # choose random point in the dict
         # to swap the dictionaries, with at least 1 swap
-        # crossing_point = self.rng.integers(1,25)
+        crossing_point = self.rng.integers(26)
 
-        # temp = sol1[:crossing_point].copy()
-        # sol1[:crossing_point], sol2[:crossing_point] = sol2[:crossing_point], temp
+        temp = sol1[:crossing_point].copy()
+        sol1[:crossing_point], sol2[:crossing_point] = sol2[:crossing_point], temp
 
-        # sol1 = sol1.flatten()
-        # sol2 = sol2.flatten()
+        sol1 = sol1.flatten()
+        sol2 = sol2.flatten()
 
 
-        prob_matrix = self.rng.integers(0, 2, size=26)
-        offspring1 = np.where(prob_matrix == 0, sol1, sol2)
-        offspring2 = np.where(prob_matrix == 1, sol1, sol2)
+        # prob_matrix = self.rng.integers(0, 2, size=26)
+        # offspring1 = np.where(prob_matrix == 0, sol1, sol2)
+        # offspring2 = np.where(prob_matrix == 1, sol1, sol2)
         
-        self.validate_solution(offspring1)
-        self.validate_solution(offspring2)
+        self.validate_solution(sol1)
+        self.validate_solution(sol2)
 
-        return offspring1, offspring2
+        return sol1, sol2
 
     
-    def decode_message(self, message, solution):
+    def decode_message(self, solution):
         """apply permutation to message according to the
         solution
 
@@ -213,7 +280,7 @@ class GeneticAlgo:
             string: message after applying the solution
         """
         table = str.maketrans("".join(self.alphabet), "".join(self.alphabet[solution]))
-        new_message = message.translate(table)
+        new_message = self.encoded_message.translate(table)
         
         return new_message
 
@@ -247,15 +314,16 @@ class GeneticAlgo:
             float: a score for the given solution
         """
         self.fitness_count += 1
-        decrypt_message = self.decode_message(self.encoded_message, solution)
+        cut_message = self.decode_message(solution)
 
-        spaces = decrypt_message.count(" ")
-        length = len(decrypt_message) - spaces
-        message_words = decrypt_message.split(" ")
+        spaces = cut_message.count(" ")
+        length = len(cut_message) - spaces
+        message_words = cut_message.split(" ")
 
         # remove any empty words
         while message_words.count("") != 0:
             message_words.remove("")
+        
 
         iterable_args = [[word, self.word_dict] for word in message_words]
 
@@ -266,16 +334,16 @@ class GeneticAlgo:
         word_scores = np.array(score_futures.get())
         word_score = np.sum(word_scores)
 
-        letter_count = Counter(decrypt_message)
-        pair_count = self.count_pairs(decrypt_message)
+        letter_count = Counter(cut_message)
+        pair_count = self.count_pairs(cut_message)
         word_score = word_score / len(message_words)
         letter_score = 0
         pair_score = 0
 
         for char1 in self.alphabet:
-            letter_score += abs(letter_count[char1]/length - self.letter_freq[char1])/len(self.alphabet)
+            letter_score += (letter_count[char1]/length - self.letter_freq[char1])**2/len(self.alphabet)
             for char2 in self.alphabet:
-                pair_score += abs(pair_count[char1+char2]/(length-1) - self.pair_freq[char1+char2])/(len(self.alphabet))**2
+                pair_score += (pair_count[char1+char2]/(length-1) - self.pair_freq[char1+char2])**2/(len(self.alphabet))**2
                
         score = (self.word_coeff*word_score +
                 self.letter_coeff*(1 - letter_score) + self.pairs_coeff*(1 - pair_score))

@@ -23,20 +23,21 @@ def pickle_eval_word(args):
     Returns:
         score: a number representing a word's score
     """
-
-
     word, word_dict = args[:2]
-    min_hamming_distance = 1
-
     length = len(word)
+    
     if word in word_dict[length]:
             return 1
-
+    
+    min_hamming_distance = 1
     for dict_word in word_dict[length]:
-        hamming_distance = sum(char1 != char2 for char1, char2 in zip(word, dict_word)) / length
+        hamming_distance = sum(char1 != char2 for char1, char2 in zip(word, dict_word))/length
         min_hamming_distance = min(min_hamming_distance, hamming_distance)
-
-    return (1 - min_hamming_distance)
+    
+    if min_hamming_distance > 0.5:
+        return 0
+    
+    return (1 - min_hamming_distance), word
     
     
 def graph_stats(stats, param):
@@ -46,6 +47,8 @@ def graph_stats(stats, param):
     plt.plot(iterations, avg_score_data, color='g', label="average score")
     plt.plot(iterations, max_score_data, color='r', label="max score")
     plt.legend()
+    plt.title(f"coefficients {param[0]}, {param[1]}, {param[2]}")
+    plt.suptitle("generation size:200, replication rate:0.3, mutation rate:0.8, number of mutations:5")
     plt.savefig(f"{param[0]}, {param[1]}, {param[2]}.png")
     plt.clf()
 
@@ -84,19 +87,19 @@ if __name__ == "__main__":
             freq, pair = line.split("\t")
             pair_freq[pair.lower()] = float(freq)
 
-    gen_size = 150
-    replication_rate = 0.25
+    gen_size = 200
+    replication_rate = 0.3
     cross_over_rate = 1-replication_rate
     mutation_rate = 0.8
-    mutation_number = 3
+    mutation_number = 5
     word_coeff = 20
     letter_coeff = 5
     pair_coeff = 13
     
-    repeats = 1
+    repeats = 15
     mp.set_start_method('spawn')
-    params = [[30,1,1]]
-    # params = [[10,7,3],[5,1,0],[3,1,0],[5,3,1],[1,1,1]]
+    # params = [[10,5,1]]
+    params = [[20,5,13], [10,7,3],[5,1,0],[3,1,0],[5,3,1],[1,1,1]]
     # params = [75, 100, 125, 150, 200, 250, 300]
     with open("param_results.csv", 'a') as res:
         res.write("word_coeff,letter_coeff,pair_coeff,fitness_count,score,cover:\n")
@@ -117,13 +120,12 @@ if __name__ == "__main__":
             
             for i in range(repeats):
                 genetic_algo = GeneticAlgo(*algo_settings)
-                # sol1 = np.random.permutation(26)
-                # sol2 = np.random.permutation(26)
-                # genetic_algo.cross_over(sol1, sol2)
-                solution, fitness_count, stats = genetic_algo.run(360)
-                if i == 0:
+
+                solution, fitness_count, stats = genetic_algo.run(150)
+                
+                if i == 14:
                     graph_stats(stats, param)
-                    plain_text = genetic_algo.decode_message(enc_mess, solution)
+                    plain_text = genetic_algo.decode_message(solution)
                 
                 avg_score += genetic_algo.eval_func(solution)
                 avg_cover += genetic_algo.coverage(solution)
