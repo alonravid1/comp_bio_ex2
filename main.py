@@ -54,6 +54,7 @@ if __name__ == "__main__":
             pair_freq[pair.lower()] = float(freq)
 
     gen_size = 100
+    gen_size = 100
     replication_rate = 0.1
     cross_over_rate = 1-replication_rate
     mutation_rate = 0.7
