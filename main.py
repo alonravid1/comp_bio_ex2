@@ -38,9 +38,8 @@ if __name__ == "__main__":
         
 
     genetic_algo = Algo(*algo_settings)
-    solutions = genetic_algo.run(10)
+    solutions = genetic_algo.run(150)
 
-    print(genetic_algo.decode_message(enc_mess, solutions[0]))
     print(alphabet[solutions[0]])
 
     # rng = np.random.default_rng(7)

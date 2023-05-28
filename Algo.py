@@ -1,7 +1,5 @@
 import numpy as np
 import re
-from timebudget import timebudget
-import concurrent.futures
 
 class Algo:
     
@@ -19,14 +17,20 @@ class Algo:
         # make gen size even to make life easier
         self.gen_size = gen_size + (gen_size % 2)
         self.rng = np.random.default_rng(7)
+
+        replicated = int(self.gen_size*self.replication_rate)
+        self.replicated_portion = replicated + replicated % 2
+        self.cross_over_portion = self.gen_size - self.replicated_portion
         
 
     def run(self, iterations):
         solutions = self.get_founder_gen()
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=100)
         for i in range(iterations):
             solutions = self.evolve_new_gen(solutions)
-        self.executor.shutdown(wait=True)
+            if i%20 == 0:
+                print(f"iteration:{i},best score is:{self.eval_func(solutions[0])}")
+                print(self.decode_message(self.encoded_message, solutions[0])[:100])
+
         return solutions
             
     
@@ -66,7 +70,7 @@ class Algo:
     def cross_over(self, sol1, sol2):
         # choose random point in the dict
         # to swap the dictionaries, with at least 1 swap
-        crossing_point = self.rng.randint(1,25)
+        crossing_point = self.rng.integers(1,25)
 
         temp = sol1[:crossing_point].copy()
         sol1[:crossing_point], sol2[:crossing_point] = sol2[:crossing_point], temp
@@ -76,6 +80,8 @@ class Algo:
         
         self.validate_solution(sol1)
         self.validate_solution(sol2)
+
+        return sol1, sol2
 
     
     def decode_message(self, message, solution):
@@ -111,21 +117,43 @@ class Algo:
         letter_score = 0
         pair_score = 0
 
+        letter_count = dict()
+        pair_count = dict()
+
+        spaces = decrypt_message.count(" ")
+        length = len(decrypt_message) - spaces
+
         for word in message_words:
             if word in self.dict_words:
                 # criteriea 1: words in dict/words in message
                 valid_word_count += 1
             for i in range(len(word)):
                 # criteriea 2: sum of frequencies of single letters
-                letter_score += self.letter_freq[word[i]]
+                if word[i] not in letter_count:
+                    letter_count[word[i]] = 0
+                letter_count[word[i]] += 1
                 if i+1 < len(word):
                     # criteriea 3: sum of frequencies of pairs of letters
-                    pair_score += self.pair_freq[word[i:i+2]]
+                    if word[i:i+2] not in pair_count:
+                        pair_count[word[i:i+2]] = 0
+                    pair_count[word[i:i+2]] += 1
         
         valid_word_count = valid_word_count / len(message_words)
-        letter_score = letter_score / len(decrypt_message)
-        pair_score = pair_score / len(decrypt_message)
-        score = 10*valid_word_count + 5*letter_score + pair_score
+        
+        for char1 in self.alphabet:
+            if char1 not in letter_count:
+                letter_count[char1] = 0
+            letter_score += (letter_count[char1]/length - self.letter_freq[char1])**2
+
+            for char2 in self.alphabet:
+                if (char1 + char2) not in pair_count:
+                    pair_count[char1+char2] = 0
+                pair_score += (pair_count[char1+char2]/(length-1) - self.pair_freq[char1+char2])**2
+                
+        letter_score = 1 - letter_score/len(self.alphabet)
+        pair_score = 1 - pair_score/(len(self.alphabet)**2)
+
+        score = 20*valid_word_count + 5*letter_score + 13*pair_score
         
         return score
     
@@ -133,9 +161,9 @@ class Algo:
     
     def mutate(self, solution):
         for i in range(26):
-            rand = self.rng.rand(1)
+            rand = self.rng.random(1)
             if rand <= self.mutation_rate:
-                swap = self.rng.randint(25)
+                swap = self.rng.integers(25)
                 
                 temp = solution[i].copy()
                 solution[i] = solution[swap]
@@ -150,50 +178,37 @@ class Algo:
             self.rng.shuffle(i)
         return solutions
     
-    def softmax(self, x):
-        """softmax function, reducing the max element from each
-        element for better numerical stabilty
-
-        Args:
-            x (_type_): _description_
-
-        Returns:
-            _type_: _description_
-        """
-        vec = np.exp(x - np.max(x))
-        vec_sum = np.sum(vec)
-        return (vec / vec_sum)
         
     
-    @timebudget
     def evolve_new_gen(self, solutions):
         dtype = [('score', float), ('index', int)]
         score_index_arr = np.array([(0, 0) for i in range(self.gen_size)], dtype=dtype)
-        for ind, score in zip(np.arange(self.gen_size), self.executor.map(self.eval_func, solutions,chunksize=1)):
-            score = self.softmax(score)
-            score_index_arr[ind]['score'] = score
-            score_index_arr[ind]['index'] = ind
+        for i in range(self.gen_size):
+            score_index_arr[i]['score'] = self.eval_func(solutions[i])
+            score_index_arr[i]['index'] = i
         
         # sorts the solutions in ascending order
         score_index_arr.sort(order='score')
 
-        # make score colmutive
+        # make score cumulative
+        score_sum = np.sum(score_index_arr['score'])
+        score_index_arr['score'] = score_index_arr['score'] / score_sum
+
         for i in range(1, self.gen_size):
             score_index_arr[i]['score'] = score_index_arr[i]['score'] + score_index_arr[i-1]['score']
+
         new_solutions = np.zeros((self.gen_size, 26), dtype=int)
 
         # replicate the best solution
-        replicated = int(self.gen_size*self.replication_rate)
-        replicated += replicated % 2
-        new_solutions[0:replicated] = np.tile(solutions[score_index_arr[-1]['index']], (replicated,1))
-        random_portions = self.rng.rand(50,2)
-        for i in zip(range(replicated, self.gen_size, 2), ):
+        new_solutions[:self.replicated_portion] = np.tile(solutions[score_index_arr[-1]['index']], (self.replicated_portion,1))
+
+        for i in range(self.replicated_portion, self.gen_size, 2):
             # for all other solutions, pick two at a time to
             # crossover and add to the new generation, biased
             # such that higher scoring solutions have a higher
             # of being picked
-            rand1 = self.rng.rand(1)
-            rand2 = self.rng.rand(1)
+            rand1 = self.rng.random(1)
+            rand2 = self.rng.random(1)
 
             # rand1 = self.rng.randint(0, self.gen_size)
             # rand2 = self.rng.randint(0, self.gen_size)
@@ -209,11 +224,9 @@ class Algo:
             # print(solutions[index1])
             # print(solutions[index2])
 
-            self.cross_over(solutions[index1], solutions[index2])
-            
-            new_solutions[i] = solutions[index1]
-            new_solutions[i+1] = solutions[index2]
-            
+            sol1, sol2 = self.cross_over(solutions[index1].copy(), solutions[index2].copy())
+            new_solutions[i] = sol1
+            new_solutions[i+1] = sol2
 
         for solution in new_solutions:
             self.mutate(solution)
