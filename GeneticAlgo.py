@@ -260,9 +260,13 @@ class GeneticAlgo:
         Args:
             solution (np.array): an array of integers between 0 and 25 representing the alphabet
         """
-        for i in range(26):
+        for i in range(self.mutation_number):
             rand = self.rng.random(1)
             if rand <= self.mutation_rate:
+                swap1 = self.rng.integers(26)
+                swap2 = self.rng.integers(26)
+                solution[swap1], solution[swap2] = solution[swap2], solution[swap1]
+
                 swap1 = self.rng.integers(26)
                 swap2 = self.rng.integers(26)
                 solution[swap1], solution[swap2] = solution[swap2], solution[swap1]
