@@ -1,32 +1,33 @@
 import numpy as np
 import re
 from collections import Counter
-import time
 
     
 class GeneticAlgo:
     
-    def __init__(self, enc_message, letter_freq, pair_freq,
-                 word_dict, replication_rate, cross_over_rate,
-                 mutation_rate, mutation_number, gen_size, executor, word_eval_func,
-                 word_coeff, letter_coeff, pairs_coeff):
+    def __init__(self, replication_rate, cross_over_rate,
+                 mutation_rate, mutation_number, gen_size,
+                 word_weight, letter_weight, pairs_weight, 
+                 swaps, enc_message, word_dict, letter_freq,
+                 pair_freq, executor=None, word_eval_func=None):
         """sets all parameters of the algorithm, generates any independent
         variables such as the rng object and solution representation.
 
         Args:
+            replication_rate (float): portion of generation which is replicated as is to the next
+            cross_over_rate (float): portion of generation which is crossed over
+            mutation_rate (float): chance for a single letter in a solution to be mutated
+            mutation_number (int): maximum number of mutations per solution
+            gen_size (int): number of soluttions in  a generation
+            executor (process pool): a pool of processes for multiprocessing words
+            word_eval_func (function): a picklable function which evaluates a word
+            word_weight (float): coefficient of word score
+            letter_weight (float): coefficient of letter frequency score
+            pairs_weight (float): coefficient of letter pairs frequency score
             enc_message (string): an encoded message
             letter_freq (dict): a dictionary of characters and their frequency
             pair_freq (dict): a dictionary of pairs of characters and their frequency
             word_dict (set): a set of valid words
-            replication_rate (float): portion of generation which is replicated as is to the next
-            cross_over_rate (float): portion of generation which is crossed over
-            mutation_rate (float): chance for a single letter in a solution to be mutated
-            gen_size (int): number of soluttions in  a generation
-            executor (process pool): a pool of processes for multiprocessing words
-            word_eval_func (function): a picklable function which evaluates a word
-            word_coeff (float): coefficient of word score
-            letter_coeff (float): coefficient of letter frequency score
-            pairs_coeff (float): coefficient of letter pairs frequency score
         """
         
         self.alphabet = np.array([chr(i) for i in range(ord('a'), ord('z') + 1)])
@@ -48,9 +49,9 @@ class GeneticAlgo:
         self.executor = executor
         self.word_eval_func = word_eval_func
         
-        self.word_coeff = word_coeff
-        self.letter_coeff = letter_coeff
-        self.pairs_coeff = pairs_coeff
+        self.word_weight = word_weight
+        self.letter_weight = letter_weight
+        self.pairs_weight = pairs_weight
         self.temp_coeff = 0
         self.fitness_count = 0
 
@@ -60,6 +61,7 @@ class GeneticAlgo:
 
         # for evaluation, remove all non abc characters
         self.encoded_message = re.sub('[0-9\[\](){}<>;@&^%$!*?,.\n]', '', self.encoded_message)
+        self.swaps = swaps
         
     def coverage(self, solution):
         """calculate the coverage of valid words out of the words in a solution
@@ -140,9 +142,15 @@ class GeneticAlgo:
     #     return np.array(new_solution)
                         
         
-        
+    def init_run(self, iterations=None):
+        self.solutions = self.get_founder_gen()
+        self.previous_best_count = 0
+        self.previous_best = self.solutions[0].copy()
+        self.iteration = 0
+        self.score_stats = np.array([(0,0)], dtype=[('max', float), ('avg', float)])
+        self.max_iterations = iterations
 
-    def run(self, iterations=None):
+    def iterate_step(self):
         """starts running the algorithm, with the given number of iterations
 
         Args:
@@ -151,50 +159,52 @@ class GeneticAlgo:
         Returns:
             list: a list of solutions, sorted in ascending order
         """
-        solutions = self.get_founder_gen()
-        previous_best_count = 0
-        previous_best = solutions[0].copy()
-        i = 0
-        score_stats = np.array([(0,0)], dtype=[('max', float), ('avg', float)])
-
-        while previous_best_count < 5 and i != iterations:
-            solutions, avg_score, max_score = self.evolve_new_gen(solutions)
-            new_val = np.array([(max_score, avg_score)], dtype=[('max', float), ('avg', float)])
-            score_stats = np.append(score_stats, new_val)
-
-            if (previous_best == solutions[0]).all():
-                previous_best_count += 1
-            else:
-                previous_best = solutions[0].copy()
-                previous_best_count = 0
-
-            
-            print(f"iteration {i}, best score:{max_score}")
-            print(self.decode_message(solutions[0])[:100])
-            
-            if previous_best_count >= 3:
-                self.mutation_number = 1
-                self.replication_rate = 0.5
-                self.replicated_portion = int(self.gen_size*self.replication_rate)
-                self.replicated_portion += self.replicated_portion % 2
-                self.crossed_over_portion = (self.gen_size - self.replicated_portion)
 
 
-            # nested if to prevent unnecessary coverage computation                    
-            if previous_best_count >= 5:
-                if self.coverage(solutions[0]) < 0.5:
-                    # if the last 10 best solutions has not changed
-                    # it is a sign of early convergence, and the algorithm will 'reset'.
-                    solutions = self.get_founder_gen()
-                    previous_best_count = 0
-                    previous_best = solutions[0].copy()
-                    print("reset")
+        if self.previous_best_count < 5 or self.iteration == self.max_iterations:
+            return_stats = [self.solutions[0], self.fitness_count, self.score_stats,
+                             self.iteration, self.coverage(self.previous_best), True]
+            return return_stats
+        
+        self.solutions, avg_score, max_score = self.evolve_new_gen(self.solutions)
+        new_val = np.array([(max_score, avg_score)], dtype=[('max', float), ('avg', float)])
+        self.score_stats = np.append(self.score_stats, new_val)
+
+        if (self.previous_best == self.solutions[0]).all():
+            self.previous_best_count += 1
+        else:
+            self.previous_best = self.solutions[0].copy()
+            self.previous_best_count = 0
+
+        
+       
+        print(self.decode_message(self.solutions[0])[:100])
+        
+        if self.previous_best_count >= 3:
+            self.mutation_number = 1
+            self.replication_rate = 0.5
+            self.replicated_portion = int(self.gen_size*self.replication_rate)
+            self.replicated_portion += self.replicated_portion % 2
+            self.crossed_over_portion = (self.gen_size - self.replicated_portion)
+
+        self.iteration += 1
+
+        # nested if to prevent unnecessary coverage computation                    
+        if self.previous_best_count >= 5:
+            if self.coverage(self.solutions[0]) < 0.5:
+                # if the last 10 best solutions has not changed
+                # it is a sign of early convergence, and the algorithm will 'reset'.
+                self.solutions = self.get_founder_gen()
+                self.previous_best_count = 0
+                self.previous_best = self.solutions[0].copy()
+                return self.solutions[0], -1, 0, self.iteration, 0, False
 
 
-            i += 1
-
-        print(f"best solution found at generation {i}, in {self.fitness_count} evaluations")        
-        return solutions[0], self.fitness_count, score_stats
+        
+        
+        return_stats = [self.solutions[0], self.fitness_count, max_score,
+                             self.iteration, self.coverage(self.previous_best), False]       
+        return return_stats
             
     
     def validate_solution(self, solution):
@@ -268,19 +278,22 @@ class GeneticAlgo:
         return sol1, sol2
 
     
-    def decode_message(self, solution):
+    def decode_message(self, solution, message=None):
         """apply permutation to message according to the
         solution
 
         Args:
-            message (string): message to be decoded
             solution (np.array): an array of integers between 0 and 25 representing the alphabet
+            message (string, optional): message to be decoded, defaults to the class's message
 
         Returns:
             string: message after applying the solution
         """
         table = str.maketrans("".join(self.alphabet), "".join(self.alphabet[solution]))
-        new_message = self.encoded_message.translate(table)
+        if message != None:
+            new_message = message.translate(table)
+        else:
+            new_message = self.encoded_message.translate(table)
         
         return new_message
 
@@ -352,8 +365,8 @@ class GeneticAlgo:
             for char2 in self.alphabet:
                 pair_score += (pair_count[char1+char2]/(length-1) - self.pair_freq[char1+char2])**2/(len(self.alphabet))**2
                
-        score = (self.word_coeff*word_score +
-                self.letter_coeff*(1 - letter_score) + self.pairs_coeff*(1 - pair_score))
+        score = (self.word_weight*word_score +
+                self.letter_weight*(1 - letter_score) + self.pairs_weight*(1 - pair_score))
 
         return score
     
