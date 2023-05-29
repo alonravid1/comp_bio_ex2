@@ -88,9 +88,8 @@ class Gui:
         deep copying the very flexible nested arrays of elements.
         """
         fresh_layout = [
-                    [sg.Text(key="show_iter", font='any 18')],
-                    [sg.Text(key="show_stats", font='any 18')],
-                    [sg.Text(key="show_mess", font='any 18')]
+                    [sg.MLine(size=(90,30), key='-ML-'+sg.WRITE_ONLY_KEY)],
+                    [sg.Button('Exit')]
                     ]
         
         return fresh_layout
@@ -201,8 +200,6 @@ class Gui:
                 algo = LamarckAlgo(*new_algo_values)
 
             finished_flag = False
-            print_message = ""
-            print_stats = ""
             algo.init_run(150)
 
             while not finished_flag:
@@ -211,22 +208,25 @@ class Gui:
                 iteration, coverage, finished_flag = returned_stats[3:]
 
                 plain_text = algo.decode_message(solution, enc_mess)
-                print_decoded_mess = plain_text[0:98]
+                decoded_mess = plain_text[:98]
 
                 if fitness_count == -1:
-                    print_message = f"reset at iteration {iteration}"
-                    window['show']
+                    window['-ML-'+sg.WRITE_ONLY_KEY].print(f"reset at iteration {iteration}", end='')
                 elif not finished_flag:
-                    print_stats=  f"generation: {iteration}, max score: {stats}, max coverage: {coverage}"
-                    #print_decoded_mess
+                    window['-ML-'+sg.WRITE_ONLY_KEY].print(f"generation {iteration}, max score {stats}, max coverage {round(coverage*100 ,4)}%", end='')
+                    window['-ML-'+sg.WRITE_ONLY_KEY].print(decoded_mess, end='\n')
 
                 event, values = window.read(timeout=2)
-                if event == sg.WIN_CLOSED:
+
+                if event == sg.WIN_CLOSED or event == 'Exit':
+                    window.close()
                     return
+
                 
-            print_message = f"best solution found at generation {iteration}, in {fitness_count} evaluations"
-            print_stats = f"max score: {stats}, max coverage: {coverage}"
-            # print_decoded_mess
+                
+            window['-ML-'+sg.WRITE_ONLY_KEY].print(f"best solution found at generation {iteration}, in {fitness_count} evaluations", end='')
+            window['-ML-'+sg.WRITE_ONLY_KEY].print(f"max score: {stats}, max coverage: {round(coverage*100 ,4)}%", end='')
+            window['-ML-'+sg.WRITE_ONLY_KEY].print(decoded_mess, end='\n')
 
             
             
@@ -242,7 +242,10 @@ class Gui:
             with open("plain.txt", 'w+') as gen_sol:
                 gen_sol.write(plain_text)
 
-            sg.popup(f"Message decoded in {fitness_count} evaluations")
+            event, values = window.read(timeout=2)
+
+            if event == sg.WIN_CLOSED:
+                return
 
 
         

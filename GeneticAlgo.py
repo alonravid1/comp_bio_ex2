@@ -161,7 +161,7 @@ class GeneticAlgo:
         """
 
 
-        if self.previous_best_count < 5 or self.iteration == self.max_iterations:
+        if self.previous_best_count > 5 or self.iteration == self.max_iterations:
             return_stats = [self.solutions[0], self.fitness_count, self.score_stats,
                              self.iteration, self.coverage(self.previous_best), True]
             return return_stats
@@ -176,9 +176,6 @@ class GeneticAlgo:
             self.previous_best = self.solutions[0].copy()
             self.previous_best_count = 0
 
-        
-       
-        print(self.decode_message(self.solutions[0])[:100])
         
         if self.previous_best_count >= 3:
             self.mutation_number = 1
