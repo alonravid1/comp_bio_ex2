@@ -3,38 +3,6 @@ import numpy as np
 
 class DarwinAlgo(GeneticAlgo):
     
-    def __init__(self, enc_message, letter_freq, pair_freq,
-                 word_set, replication_rate, cross_over_rate,
-                 mutation_rate, gen_size, executor, word_eval_func,
-                 word_coeff, letter_coeff, pairs_coeff, swaps):
-        """sets all parameters of the algorithm, generates any independent
-        variables such as the rng object and solution representation.
-
-        Args:
-            enc_message (string): an encoded message
-            letter_freq (dict): a dictionary of characters and their frequency
-            pair_freq (dict): a dictionary of pairs of characters and their frequency
-            word_set (set): a set of valid words
-            replication_rate (float): portion of generation which is replicated as is to the next
-            cross_over_rate (float): portion of generation which is crossed over
-            mutation_rate (float): chance for a single letter in a solution to be mutated
-            gen_size (int): number of soluttions in  a generation
-            executor (process pool): a pool of processes for multiprocessing words
-            word_eval_func (function): a picklable function which evaluates a word
-            word_coeff (float): coefficient of word score
-            letter_coeff (float): coefficient of letter frequency score
-            pairs_coeff (float): coefficient of letter pairs frequency score
-            swaps (int): how many swaps the optimization function does
-        """
-        
-        super().__init__(enc_message, letter_freq, pair_freq,
-                         word_set, replication_rate, cross_over_rate,
-                         mutation_rate, gen_size, executor, word_eval_func,
-                         word_coeff, letter_coeff, pairs_coeff)
-        
-        self.swaps = swaps
-        
-        
     def optimization_score(self, solution):
         score = self.eval_func(solution)
         for i in range(self.swaps):
@@ -51,6 +19,7 @@ class DarwinAlgo(GeneticAlgo):
             new_score = self.eval_func(solution)
             if new_score > score:
                 score = new_score
+
         return score
     
     def evolve_new_gen(self, solutions):

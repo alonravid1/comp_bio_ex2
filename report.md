@@ -70,8 +70,6 @@ Often times the algorithm had come close to fully decoding the message, yet had 
 
 After successfully finding a fitness function and parameters which consistenly work, I had started by tuning the weights of the scores, the results are:
 
-Here is the provided data formatted as a markdown table:
-
 | word weight| letter weight| pair weight | average fitness count | average score | average coverage  |
 |------------|--------------|------------|---------------|-------|--------|
 | 20         | 5            | 13         | 9386          | 37.83 | 98.0%  |
@@ -84,5 +82,9 @@ Here is the provided data formatted as a markdown table:
 Seeing as the 5,3,0 weights yeild the lowest average fitness calls, alongside the highest possilbe coverage, I had decided to proceed and analyse the generation size with these weights.
 
 The result:
-
-
+| generation size | fitness count | average score | average cover |
+|----------|---------------|---------------|---------------|
+| 75      | 6300          | 3.97          | 97.0%         |
+| 100      | 5250          | 3.98          | 99.0%         |
+| 150      | 6690          | 3.97          | 97.0%         |
+| 200      | 10060         | 3.99          | 99.0%         |
