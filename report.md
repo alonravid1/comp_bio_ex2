@@ -14,7 +14,8 @@ In addition to these files, the algorithm will be tested on a range of parameter
 * Replication Rate
 * Crossover Rate
 * Mutation Rate
-* Score Variables Coefficients
+* Number of Mutations
+* Score Weights
 * Algorithm Type
 
 
@@ -24,16 +25,24 @@ all instances of 'a' with 'c'. To break the encryption is to have the permutatio
 
 At first I attempted to represent the solutions this way, but after several runs I had decided to optimize the running time by replacing the dictionaries and direct representation by characters, to a representation of solutions using a numpy array of integers between 0 and 25 which are then shifted around. If in the first place of the array is the number 2, that means the algorithm will swap 'a' with 'c', which is the letter of the 2nd cell in the array containing the alphabet.
 
-To evaluate a solution, I applied the permutation as described above on the encoded message, and then I calculated a solution's score by evaluating each word and summing their scores. A word's score was calculated based on whether or not it was a valid word from the given dictionaries, the sum of its letter frequencies and the sum of pairs of letters frequencies, each multiplyed by a parameter coefficient as described in the following equation:
+To evaluate a solution, I applied the permutation as described above on the encoded message, and then I calculated a solution's score by evaluating each word in the following way:
 
-$score = a \cdot 1_{is\_valid\_word} \cdot word\_length + b \cdot \text{letters\_freq} + c \cdot \text{pairs\_freq}$
+* If the word is in the dictionary, its score is 1.
+
+* If it isn't, the minimal hamming distance between it all other words of the same length from the dictionary is calculated and divided by the word's length. If the result it is less than 0.5, that means over half of the characters would need to be replaced for the word to become a valid word, which is bad, and its score is 0. If its less than 0.5, the score is equal to 1 minus the hamming distance.
+
+The logic behind this is that words that are closer to valid words will have a better chance of turning into them via mutation.
+ 
+In addition, difference between its letters frequencies distribution from the given letter frequencies distribution, and the difference between its paris frequencies distribution from the given letter paris frequencies distribution, each multiplyed by a weight, presented in the following equation where ham(word) is a word's hamming distance as above:
+
+$score = a \cdot \sum_{word}(\frac {1-ham(word)} {\#words})  + b \cdot \sum_{letter} \frac{(sol\_freq-dict\_freq)^2} {message\_length} + c \cdot \sum_{pair} \frac{(sol\_freq-dict\_freq)^2} {message\_length-1}$
 
 ## Evolution of Solutions <a name=evolve></a>
 In order to apply evolutionary pressure over a generation of solutions while creating a greater variance of solutions, 3 rules were applied during the creation of a new generation:
 
-1.The best solutions was copied "as is".
+1.The best solutions was copied "as is" once, and several times more each being mutated as usual.
 2.The rest of the solutions were created by crossing over two solutions at a time. The solutions were picked via linear sampling, that is the chance to pick a solution was equal to its score's proportion out of the sum of all scores.
-3.All solutions generated via crossovers were mutated, where each letter had a small chance to be randomly swapped with another letter in the solution array.
+3.All solutions generated except the very first were mutated, where for a set number of times it had a relatively high chance to have one of its cells swapped with another.
 
 The crossing over was applied by taking two arrays, randomly generating a number in between 1 and 25, and then "cutting" both arrays at that index, and then gluing them together such that the first solution's first part is glued to the second solution's second part, and the second solution's first part is glued to the first solution's second part.
 
@@ -42,13 +51,38 @@ Afterwards, the solutions's validty was checked and fixed by searching for doubl
 ## Early Convergance Problem and Halting<a name=conv></a>
 A problem facing genetic algorithms is an early convergence to a local maximum point. Because the solution with the highest score is replicated multiple times at the next generation, and a solution's chance to be chosen for crossover is defined as the porportion of its score to the total score of all solutions, the highest scoring ones can replace the majority of other solutions.
 
-When this happens, we remain with a much less diverse population which is concentrated around a local maximum, without the abilty to overcome it and thus becoming stuck there. In order to overcome this problem, I programmed the algorithm to follow the following logic:
+When this happens, we remain with a much less diverse population which is concentrated around a local maximum, without the abilty to overcome it and thus becoming stuck there. In order to overcome this problem, if for the past 3 generations the best solution has not changed, the algorithm calculates the coverage of valid words over the decoded message words.
 
-Check wether the best solution had changed in the last 5 generation. If not, calculate the coverage of valid words over the decoded message words:
-* If the coverage is lower than 50%, that means the best solution is stuck but the current solution is far from the optimal one, since a large majority of  the message's words should be found in the dictionary. In this case the algorithm "resets", generating a new random generation and continues from there to the next generation, without reseting the fitness count.
-* If the coverage is lower than 90% but above 50%, that means in most likelihood that the current solution is good, but has a few words with less frequent letters which are still wrong. To correct this slight difference, the letter pairs frequency's coefficient is increased, and the single letter's is decreased, with mutation rate increasing as well to diversify the solution space in hope of getting the last few letter swaps required.
+If the coverage is lower than 50%, that means the best solution is stuck but the current solution is far from the optimal one, since a large majority of the message's words should be found in the dictionary. In this case the algorithm "resets", generating a new random generation and continues from there to the next generation, without reseting the fitness count.
 
-The algorithm stops running and returns the current best solution once it has not changed for the last 10 generations, and the coverage is higher than 90%.
 
 ## Algorithm Analysis<a name=algo></a>
-At first I 
+Initially I had to experiment with a variety of fitness function and parameters until I managed to find a fitness function which consistently converged with high coverage and within a reasonable number of fitness calls, with the following parameters:
+* Generation Size: 200
+* Replication Rate: 0.3
+* Crossover Rate: 0.7
+* Mutation Rate: 0.8
+* Number of Mutations: 5
+* Score Weights: word:20, letters:5, pairs:13
+
+While searching for a working combination, I had encountered a persistent problem which was quite hard to tackle:
+Often times the algorithm had come close to fully decoding the message, yet had a handful of characters which were swapped, particulary characters with low frequency such as x and j. I had attempted to fix this problem in a multitude of ways,such as increasing the weight of pairs of characters in hope that the x will be paired with its more common combination pair correctly, increasing the mutation rate and many more methods. Despite my attempts, it often took as many iterations to reach this local maximum as it took to overcome it. Eventually I solved it after several major changes to the fitness function and mutation method, where once it had converged to a close local maximum, the replication rate was increased to 0.5, but the number of mutations was reduced to one, as there were many solutions with a handful of incorrect letters which were then one by one fixed a single mutation at a time.
+
+After successfully finding a fitness function and parameters which consistenly work, I had started by tuning the weights of the scores, the results are:
+
+Here is the provided data formatted as a markdown table:
+
+| word weight| letter weight| pair weight | average fitness count | average score | average coverage  |
+|------------|--------------|------------|---------------|-------|--------|
+| 20         | 5            | 13         | 9386          | 37.83 | 98.0%  |
+| 10         | 7            | 3          | 9560          | 19.89 | 96.0%  |
+| 5          | 1            | 0          | 10320         | 5.98  | 99.0%  |
+| 3          | 1            | 0          | 9340          | 3.99  | 99.0%  |
+| 5          | 3            | 1          | 9160          | 8.95  | 97.0%  |
+| 1          | 1            | 1          | 10240         | 2.99  | 99.0%  |
+
+Seeing as the 5,3,0 weights yeild the lowest average fitness calls, alongside the highest possilbe coverage, I had decided to proceed and analyse the generation size with these weights.
+
+The result:
+
+

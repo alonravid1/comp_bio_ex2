@@ -23,19 +23,19 @@ def pickle_eval_word(args):
     Returns:
         score: a number representing a word's score
     """
-    word, word_dict = args[:2]
+    word, word_set = args[:2]
     length = len(word)
     
-    if word in word_dict[length]:
-            return 1
+    if word in word_set:
+            return 1, word
     
     min_hamming_distance = 1
-    for dict_word in word_dict[length]:
-        hamming_distance = sum(char1 != char2 for char1, char2 in zip(word, dict_word))/length
+    for set_word in word_set:
+        hamming_distance = sum(char1 != char2 for char1, char2 in zip(word, set_word))/length
         min_hamming_distance = min(min_hamming_distance, hamming_distance)
     
     if min_hamming_distance > 0.5:
-        return 0
+        return 0, word
     
     return (1 - min_hamming_distance), word
     
@@ -47,9 +47,11 @@ def graph_stats(stats, param):
     plt.plot(iterations, avg_score_data, color='g', label="average score")
     plt.plot(iterations, max_score_data, color='r', label="max score")
     plt.legend()
-    plt.title(f"coefficients {param[0]}, {param[1]}, {param[2]}")
-    plt.suptitle("generation size:200, replication rate:0.3, mutation rate:0.8, number of mutations:5")
-    plt.savefig(f"{param[0]}, {param[1]}, {param[2]}.png")
+    plt.suptitle(f"gen size: {str(param)}")
+    plt.title("weights: [5,3,0], replication rate: 0.3, mutation rate: 0.8, number of mutations: 5")
+    # plt.title("weights: [5,3,0], gen size: 100, replication rate: 0.3, mutation rate: 0.8, number of mutations: 5")
+
+    plt.savefig(f"{str(param)}.png")
     plt.clf()
 
 if __name__ == "__main__":
@@ -87,30 +89,33 @@ if __name__ == "__main__":
             freq, pair = line.split("\t")
             pair_freq[pair.lower()] = float(freq)
 
-    gen_size = 200
+    gen_size = 100
     replication_rate = 0.3
     cross_over_rate = 1-replication_rate
     mutation_rate = 0.8
     mutation_number = 5
-    word_coeff = 20
-    letter_coeff = 5
-    pair_coeff = 13
+    word_coeff = 3
+    letter_coeff = 1
+    pair_coeff = 0
     
-    repeats = 15
+    repeats = 10
     mp.set_start_method('spawn')
     # params = [[10,5,1]]
-    params = [[20,5,13], [10,7,3],[5,1,0],[3,1,0],[5,3,1],[1,1,1]]
-    # params = [75, 100, 125, 150, 200, 250, 300]
+    # params = [[10,7,3],[5,1,0],[3,1,0],[5,3,1],[1,1,1]]
+    params = [150, 200]
+    # params = [0.3,0.6,0.9]
     with open("param_results.csv", 'a') as res:
-        res.write("word_coeff,letter_coeff,pair_coeff,fitness_count,score,cover:\n")
+        # res.write("word_coeff,letter_coeff,pair_coeff,fitness_count,score,cover:\n")
+        res.write("gen_size, fitness_count,score,cover:\n")
         
-    with mp.Pool(60) as executor:
+    with mp.Pool() as executor:
         for param in params:
             avg_score = 0
             avg_fitness = 0
             avg_cover = 0
-            word_coeff, letter_coeff ,pair_coeff = param
-            # gen_size = param
+            # word_coeff, letter_coeff ,pair_coeff = param
+            gen_size = param
+            # mutation_rate = param
 
             algo_settings = [enc_mess, letter_freq, pair_freq, word_dict,
                                 replication_rate, cross_over_rate,
@@ -122,11 +127,6 @@ if __name__ == "__main__":
                 genetic_algo = GeneticAlgo(*algo_settings)
 
                 solution, fitness_count, stats = genetic_algo.run(150)
-                
-                if i == 14:
-                    graph_stats(stats, param)
-                    plain_text = genetic_algo.decode_message(solution)
-                
                 avg_score += genetic_algo.eval_func(solution)
                 avg_cover += genetic_algo.coverage(solution)
                 avg_fitness += fitness_count
@@ -135,8 +135,10 @@ if __name__ == "__main__":
             avg_cover = round(avg_cover / repeats, 2)*100
             avg_fitness = avg_fitness // repeats
             with open("param_results.csv", 'a') as res:
-                res.write(f"{word_coeff},{letter_coeff},{pair_coeff},{avg_fitness},{avg_score},{avg_cover}%\n")
-                # res.write(f"{gen_size},{fitness_count},{score},{cover}\n")
+                # res.write(f"{mutation_rate},{avg_fitness},{avg_score},{avg_cover}%\n")
+                res.write(f"{gen_size},{avg_fitness},{avg_score},{avg_cover}\n")
+            graph_stats(stats, param)
+            plain_text = genetic_algo.decode_message(solution)
         
     with open("perm.txt", 'w+') as gen_perm:
         for i in range(len(solution)):

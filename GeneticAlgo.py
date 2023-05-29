@@ -1,6 +1,7 @@
 import numpy as np
 import re
 from collections import Counter
+import time
 
     
 class GeneticAlgo:
@@ -158,7 +159,6 @@ class GeneticAlgo:
 
         while previous_best_count < 5 and i != iterations:
             solutions, avg_score, max_score = self.evolve_new_gen(solutions)
-            coverage = self.coverage(solutions[0])
             new_val = np.array([(max_score, avg_score)], dtype=[('max', float), ('avg', float)])
             score_stats = np.append(score_stats, new_val)
 
@@ -169,7 +169,7 @@ class GeneticAlgo:
                 previous_best_count = 0
 
             
-            print(f"iteration {i}, best score:{max_score}, coverage {coverage}:")
+            print(f"iteration {i}, best score:{max_score}")
             print(self.decode_message(solutions[0])[:100])
             
             if previous_best_count >= 3:
@@ -182,7 +182,7 @@ class GeneticAlgo:
 
             # nested if to prevent unnecessary coverage computation                    
             if previous_best_count >= 5:
-                if coverage < 0.5:
+                if self.coverage(solutions[0]) < 0.5:
                     # if the last 10 best solutions has not changed
                     # it is a sign of early convergence, and the algorithm will 'reset'.
                     solutions = self.get_founder_gen()
@@ -257,7 +257,7 @@ class GeneticAlgo:
         sol1 = sol1.flatten()
         sol2 = sol2.flatten()
 
-
+        # uniform crossover
         # prob_matrix = self.rng.integers(0, 2, size=26)
         # offspring1 = np.where(prob_matrix == 0, sol1, sol2)
         # offspring2 = np.where(prob_matrix == 1, sol1, sol2)
@@ -324,15 +324,22 @@ class GeneticAlgo:
         while message_words.count("") != 0:
             message_words.remove("")
         
-
-        iterable_args = [[word, self.word_dict] for word in message_words]
-
-        # used eval word to multithread this part
+        # get dictionary of words and their count
+        word_counter = Counter(message_words)
+        words = list(word_counter.keys())
+        # calculate score once per word
+        iterable_args = [[word, self.word_dict[len(word)]] for word in words]
+        
+        # used eval word to multithread the word score calculation
         score_futures = self.executor.map_async(self.word_eval_func,
-                                                iterable_args, chunksize=300)
+                                                iterable_args, chunksize=10)
 
-        word_scores = np.array(score_futures.get())
-        word_score = np.sum(word_scores)
+        word_score = 0
+        word_scores = score_futures.get()
+        
+        # calculate total score with regard to unique word score and its count
+        for score, word in word_scores:
+            word_score += word_counter[word]*score
 
         letter_count = Counter(cut_message)
         pair_count = self.count_pairs(cut_message)
@@ -391,12 +398,12 @@ class GeneticAlgo:
             solutions (_type_): _description_
         """
         score_index_arr = np.array([(0, 0) for i in range(self.gen_size)], dtype=[('score', float), ('index', int)])
-
+        
         for index in range(self.gen_size):
             score = self.eval_func(solutions[index])
             score_index_arr[index]['index'] = index
             score_index_arr[index]['score'] = score
-            
+
         # sorts the solutions in ascending order
         score_index_arr.sort(order='score')
         # get statistics
@@ -439,5 +446,4 @@ class GeneticAlgo:
             new_solutions[new_sol_index] = sol1.copy()
             new_solutions[new_sol_index + 1] = sol2.copy()
 
-        print(new_solutions)
         return new_solutions, avg_score, max_score
