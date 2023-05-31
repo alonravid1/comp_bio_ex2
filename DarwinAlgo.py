@@ -5,18 +5,18 @@ class DarwinAlgo(GeneticAlgo):
     
     def optimization_score(self, solution):
         score = self.eval_func(solution)
+        temp_solution = solution.copy()
         for i in range(self.swaps):
-            swap_pos_1 = self.rng.integers(25)
-            swap_pos_2 = self.rng.integers(25)
+            swap_pos_1 = self.rng.integers(26)
+            swap_pos_2 = self.rng.integers(26)
             
             while swap_pos_1 == swap_pos_2:
                 # prevent swapping of the same place with itself
-                swap_pos_2 = self.rng.integers(25)
-            temp = solution[swap_pos_1]
-            solution[swap_pos_1] = solution[swap_pos_2]
-            solution[swap_pos_2] = temp
+                swap_pos_2 = self.rng.integers(26)
+
+            temp_solution[swap_pos_1], temp_solution[swap_pos_2] = temp_solution[swap_pos_2], temp_solution[swap_pos_1]
             
-            new_score = self.eval_func(solution)
+            new_score = self.eval_func(temp_solution)
             if new_score > score:
                 score = new_score
 

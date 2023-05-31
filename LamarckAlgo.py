@@ -17,17 +17,22 @@ class LamarckAlgo(GeneticAlgo):
         """
         score = self.eval_func(solution)
         for i in range(self.swaps):
-            swap_pos_1 = self.rng.integers(25)
-            swap_pos_2 = self.rng.integers(25)
-            temp = solution[swap_pos_1]
-            solution[swap_pos_1] = solution[swap_pos_2]
-            solution[swap_pos_2] = temp
+            temp_solution = solution.copy()
+            swap_pos_1 = self.rng.integers(26)
+            swap_pos_2 = self.rng.integers(26)
             
-            new_score = self.eval_func(solution)
+            while swap_pos_1 == swap_pos_2:
+                # prevent swapping of the same place with itself
+                swap_pos_2 = self.rng.integers(26)
+
+            temp_solution[swap_pos_1], temp_solution[swap_pos_2] = temp_solution[swap_pos_2], temp_solution[swap_pos_1]
+            
+            new_score = self.eval_func(temp_solution)
             if new_score > score:
                 score = new_score
+                solution = temp_solution.copy()
                 
-        return score
+        return score, solution
     
     def evolve_new_gen(self, solutions):
         """_summary_
@@ -38,7 +43,7 @@ class LamarckAlgo(GeneticAlgo):
         score_index_arr = np.array([(0, 0) for i in range(self.gen_size)], dtype=[('score', float), ('index', int)])
 
         for index in range(self.gen_size):
-            score = self.optimize_solution(solutions[index])
+            score, solutions[index] = self.optimize_solution(solutions[index])
             score_index_arr[index]['index'] = index
             score_index_arr[index]['score'] = score
             

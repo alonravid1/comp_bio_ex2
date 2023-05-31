@@ -85,61 +85,6 @@ class GeneticAlgo:
                     count +=1
 
         return count/total
-
-        
-    # def perturb(self, solution):
-    #     """perturbate the solution in order to help it escape a local minima,
-    #     by forcing the permutation to switch a current valid short word with
-    #     with another
-
-    #     Args:
-    #         solution (np.array): a solution
-
-    #     Returns:
-    #         np.array: a modified solution
-    #     """
-    #     cut_message = self.decode_message(solution)
-    #     message_words = cut_message.split(" ")
-    #     short_valid_words = []
-
-    #     for word in message_words:
-    #         if word != "" and word != " " and len(word) <= 4:
-    #             if word in self.word_dict[len(word)]:
-    #                 short_valid_words.append(word)
-        
-    #     word = self.rng.choice(short_valid_words)
-    #     dict_words = list(self.word_dict[len(word)])
-    #     new_word = self.rng.choice(dict_words)
-    #     new_word = np.char.lower(new_word)
-    #     old_letters, old_index = np.unique(list(word), return_index=True)
-    #     new_letters, new_index = np.unique(list(new_word), return_index=True)
-
-        
-    #     while len(old_letters) != len(new_letters) or not np.char.isalpha(new_word):
-    #         word = np.choice(short_valid_words)
-    #         dict_words = list(self.word_dict[len(word)].values())
-    #         new_word = self.rng.choice(dict_words)
-    #         new_word = np.char.lower(new_word)
-    #         old_letters, old_index = np.unique(list(word), return_index=True)
-    #         new_letters, new_index = np.unique(list(new_word), return_index=True)
-
-    #     old_letters[np.argsort(old_index)]
-    #     new_letters[np.argsort(new_index)]
-    #     new_solution = solution.copy()
-        
-    #     letter_count = len(new_letters)
-    #     for j in range(letter_count):
-    #         for i in range(26):
-    #             if self.alphabet[solution[i]] == old_letters[j]:
-    #                 swap1 = i
-    #             if self.alphabet[solution[i]] == new_letters[j]:
-    #                 swap2 = i
-    #         print(word)
-    #         print(new_word)
-           
-    #         new_solution[swap1], new_solution[swap2] = solution[swap2], solution[swap1]
-
-    #     return np.array(new_solution)
                         
         
     def init_run(self, iterations=None):
@@ -147,7 +92,7 @@ class GeneticAlgo:
         self.previous_best_count = 0
         self.previous_best = self.solutions[0].copy()
         self.iteration = 0
-        self.score_stats = np.array([(0,0)], dtype=[('max', float), ('avg', float)])
+        self.score_stats = np.array([(0,0,0)], dtype=[('max', float), ('avg', float), ('cover', float)])
         self.max_iterations = iterations
 
     def iterate_step(self):
@@ -163,11 +108,12 @@ class GeneticAlgo:
 
         if self.previous_best_count > 5 or self.iteration == self.max_iterations:
             return_stats = [self.solutions[0], self.fitness_count, self.score_stats,
-                             self.iteration, self.coverage(self.previous_best), True]
+                             self.iteration, True]
             return return_stats
         
         self.solutions, avg_score, max_score = self.evolve_new_gen(self.solutions)
-        new_val = np.array([(max_score, avg_score)], dtype=[('max', float), ('avg', float)])
+        coverage = round(self.coverage(self.solutions[0])*100 ,4)
+        new_val = np.array([(round(max_score, 4), round(avg_score, 4), coverage)], dtype=[('max', float), ('avg', float), ('cover', float)])
         self.score_stats = np.append(self.score_stats, new_val)
 
         if (self.previous_best == self.solutions[0]).all():
@@ -188,19 +134,19 @@ class GeneticAlgo:
 
         # nested if to prevent unnecessary coverage computation                    
         if self.previous_best_count >= 5:
-            if self.coverage(self.solutions[0]) < 0.5:
+            if coverage/100 < 0.5:
                 # if the last 10 best solutions has not changed
                 # it is a sign of early convergence, and the algorithm will 'reset'.
                 self.solutions = self.get_founder_gen()
                 self.previous_best_count = 0
                 self.previous_best = self.solutions[0].copy()
-                return self.solutions[0], -1, 0, self.iteration, 0, False
+                return self.solutions[0], -1, new_val, self.iteration, False
 
 
         
         
-        return_stats = [self.solutions[0], self.fitness_count, max_score,
-                             self.iteration, self.coverage(self.previous_best), False]       
+        return_stats = [self.solutions[0], self.fitness_count, new_val,
+                            self.iteration, False]       
         return return_stats
             
     
