@@ -4,4 +4,5 @@ a Darwin variant and a Lamarck variant. The program can run simply by clicking t
 when running it it will decode the message in the enc.txt file, using the dict.txt, Letter_Freq.txt and Letter2_freq.txt which needs to be in the same directory as the executable file.
 
 
-All three algorithms are detailed in the report, as well as the parameters which I found to be optimal for running them on the encoded message, as well as on several other test.
+All three algorithms are detailed in the report, as well as the parameters which I found to be optimal for running them on the encoded message, as well as on several other test. Upon finishing decoding a message,
+the program will create two files named perm.txt and plain.txt, in which the permutation used to encode the message and the decoded message will be written respectively.
