@@ -8,7 +8,6 @@ class LamarckAlgo(GeneticAlgo):
         letter in it, and calculating its new score. if higher, it then applies
         the change.
         
-
         Args:
             solution (np.array): an array of numbers representing a character in the alphabet
 
@@ -35,10 +34,32 @@ class LamarckAlgo(GeneticAlgo):
         return score, solution
     
     def evolve_new_gen(self, solutions):
-        """_summary_
+        """calculate the optimized score of the previous gen, modifing
+        the solutions in the process. it then sorts the solutions
+        from low to high, normalize the score to be between 0 and 1
+        and calculate each solution's cumulative score in their sorted order.
+
+        that way each between any 2 solutions will be a probabilty density
+        equal to the second solution's normalized score, which will then
+        be used to pick solutions for crossover via linear sampling.
+
+        then the function replicates the best solutions into the next generation
+        according to the replictaion rate parameter, and the rest are created
+        two at a time, from a cross over of by two solutions sampled lineary to
+        their score, meaning better solutions will have better chances of being
+        crossed over.
+
+        the function then mutates all solutions except for the very best one.
+        
+         
 
         Args:
-            solutions (_type_): _description_
+            solutions (np.array): array of np arrays, a generation of solutions
+
+        Returns:
+            np.array: array containing the new generation
+            float: average score of the previous generation,
+            float: maximum score of the previous generation
         """
         score_index_arr = np.array([(0, 0) for i in range(self.gen_size)], dtype=[('score', float), ('index', int)])
 

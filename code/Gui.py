@@ -4,7 +4,6 @@ import numpy as np
 from GeneticAlgo import GeneticAlgo
 from DarwinAlgo import DarwinAlgo
 from LamarckAlgo import LamarckAlgo
-import time
 import os
 import multiprocessing as mp   
 
@@ -188,7 +187,7 @@ Show Graph will show at the end of a run a graph of the maximum and average scor
             avg_cover = 0
             avg_fitness = 0
 
-            repeats = 5
+            repeats = 10
             for i in range(repeats):
                 finished_flag = False
                 algo.init_run(150)
@@ -333,7 +332,7 @@ Show Graph will show at the end of a run a graph of the maximum and average scor
 
         
     def process_values(self, values):
-        """_summary_
+        """turn user input into relevant types
 
         Args:
             values (nparray): array of simulation parameters as entered by the user

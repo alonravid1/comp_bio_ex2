@@ -88,6 +88,13 @@ class GeneticAlgo:
                         
         
     def init_run(self, iterations=None):
+        """generates a random founder generation, sets all run parameters
+        their initial values.
+
+        Args:
+            iterations (int, optional): maximum number of iterations to run. Defaults to None,
+            which is ignored by the main loop.
+        """
         self.solutions = self.get_founder_gen()
         self.previous_best_count = 0
         self.previous_best = self.solutions[0].copy()
@@ -96,13 +103,17 @@ class GeneticAlgo:
         self.max_iterations = iterations
 
     def iterate_step(self):
-        """starts running the algorithm, with the given number of iterations
+        """runs a single iteration of the algorithm, evloving the next generation,
+        checking whether the algorithm should halt, reset or change phase into the
+        final letter optimizations.
 
-        Args:
-            iterations (int, optional): number of iterations to run
-
-        Returns:
-            list: a list of solutions, sorted in ascending order
+        Return(within an array):
+            best solution: the best solution of the previous generation
+            fitness count: how many evaluation the algorithm has done so far
+            score stats: tuple of max score, average score and max coverage in the previous
+                        generation
+            iteration: current iteration
+            finisehd flag: True if the algorithm finished running, Flase otherwise
         """
 
 
@@ -348,10 +359,29 @@ class GeneticAlgo:
         return solutions
     
     def evolve_new_gen(self, solutions):
-        """_summary_
+        """calculate the score of the previous gen, sort its solutions
+        by it from low to high, normalize the score to be between 0 and 1
+        and calculate each solution's cumulative score in their sorted order.
+
+        that way each between any 2 solutions will be a probabilty density
+        equal to the second solution's normalized score, which will then
+        be used to pick solutions for crossover via linear sampling.
+
+        then the function replicates the best solutions into the next generation
+        according to the replictaion rate parameter, and the rest are created
+        two at a time, from a cross over of by two solutions sampled lineary to
+        their score, meaning better solutions will have better chances of being
+        crossed over.
+
+        the function then mutates all solutions except for the very best one.
 
         Args:
-            solutions (_type_): _description_
+            solutions (np.array): array of np arrays, a generation of solutions
+
+        Returns:
+            np.array: array containing the new generation
+            float: average score of the previous generation,
+            float: maximum score of the previous generation
         """
         score_index_arr = np.array([(0, 0) for i in range(self.gen_size)], dtype=[('score', float), ('index', int)])
         
